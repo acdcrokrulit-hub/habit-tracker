@@ -4,6 +4,7 @@ import '../providers/habit_provider.dart';
 import '../widgets/habit_card.dart';
 import '../screens/add_habit_screen.dart';
 import '../screens/stats_screen.dart';
+import '../screens/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -394,7 +395,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
             );
           }),
-          _buildNavItem(Icons.person_rounded, 'Профиль', false),
+          _buildNavItem(Icons.person_rounded, 'Профиль', false, () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ProfileScreen(),
+              ),
+            );
+          }),
         ],
       ),
     );
