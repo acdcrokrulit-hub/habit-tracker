@@ -501,7 +501,7 @@ class _StatsScreenState extends State<StatsScreen>
 
   Widget _buildBottomNav() {
     return Consumer<HabitProvider>(
-      builder: (context, provider) {
+      builder: (context, provider, _) {
         final isDark = provider.isDarkTheme;
         return Container(
           margin: const EdgeInsets.all(20),
