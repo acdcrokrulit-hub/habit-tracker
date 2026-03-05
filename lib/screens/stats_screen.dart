@@ -300,7 +300,7 @@ class _StatsScreenState extends State<StatsScreen>
                     barTouchData: BarTouchData(
                       enabled: true,
                       touchTooltipData: BarTouchTooltipData(
-                        getTooltipColor: (_) => const Color(0xFF6C63FF),
+                        tooltipBgColor: const Color(0xFF6C63FF),
                         tooltipPadding: const EdgeInsets.all(8),
                         tooltipMargin: 8,
                       ),

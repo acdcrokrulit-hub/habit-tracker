@@ -395,9 +395,9 @@ class _AddHabitScreenState extends State<AddHabitScreen>
       Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Пожалуйста, заполните все обязательные поля'),
-          backgroundColor: Color(0xFFFF6B6B),
+        SnackBar(
+          content: const Text('Пожалуйста, заполните все обязательные поля'),
+          backgroundColor: const Color(0xFFFF6B6B),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

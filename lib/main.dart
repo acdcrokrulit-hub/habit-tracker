@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          cardTheme: CardTheme(
+          cardTheme: CardThemeData(
             color: const Color(0xFF1A1A2E),
             elevation: 8,
             shadowColor: const Color(0xFF6C63FF).withOpacity(0.3),
@@ -46,8 +46,8 @@ class MyApp extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
           ),
-          floatingActionButtonTheme: const FloatingActionButtonTheme(
-            backgroundColor: Color(0xFF6C63FF),
+          floatingActionButtonTheme: FloatingActionButtonThemeData(
+            backgroundColor: const Color(0xFF6C63FF),
             foregroundColor: Colors.white,
             elevation: 8,
           ),
