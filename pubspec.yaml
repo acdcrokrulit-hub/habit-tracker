@@ -6,6 +6,14 @@ version: 1.0.0+1
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
+platforms:
+  android:
+    package: com.habittracker.app
+  ios:
+    bundleIdentifier: com.habittracker.app
+  web:
+  windows:
+
 dependencies:
   flutter:
     sdk: flutter
