@@ -108,7 +108,7 @@ flutter build ios --release
 
 ## 👨‍💻 Автор
 
-**acdcrokrulit-hub**
+**Rinatik**
 
 ## 📄 Лицензия
 
@@ -121,7 +121,5 @@ Pull requests приветствуются! Для серьезных измен
 ---
 
 <div align="center">
-
-**Сделано с ❤️ на Flutter**
 
 </div>
