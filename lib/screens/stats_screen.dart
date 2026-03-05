@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/habit_provider.dart';
+import 'home_screen.dart';
+import 'profile_screen.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -14,6 +16,7 @@ class _StatsScreenState extends State<StatsScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  int _selectedIndex = 1;
 
   @override
   void initState() {
@@ -51,26 +54,32 @@ class _StatsScreenState extends State<StatsScreen>
           ),
         ),
         child: SafeArea(
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildAppBar(),
-                  const SizedBox(height: 24),
-                  _buildHeader(),
-                  const SizedBox(height: 24),
-                  _buildStatsGrid(),
-                  const SizedBox(height: 24),
-                  _buildWeeklyChart(),
-                  const SizedBox(height: 24),
-                  _buildAchievements(),
-                  const SizedBox(height: 100),
-                ],
+          child: Column(
+            children: [
+              Expanded(
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildAppBar(),
+                        const SizedBox(height: 24),
+                        _buildHeader(),
+                        const SizedBox(height: 24),
+                        _buildStatsGrid(),
+                        const SizedBox(height: 24),
+                        _buildWeeklyChart(),
+                        const SizedBox(height: 24),
+                        _buildAchievements(),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
+              _buildBottomNav(),
+            ],
           ),
         ),
       ),
@@ -488,5 +497,82 @@ class _StatsScreenState extends State<StatsScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildBottomNav() {
+    return Consumer<HabitProvider>(
+      builder: (context, provider) {
+        final isDark = provider.isDarkTheme;
+        return Container(
+          margin: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: (isDark ? const Color(0xFF6C63FF) : const Color(0xFF1A1A2E)).withOpacity(0.3),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 20,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home_rounded, _getLabel(provider.language, 'home'), 0),
+              _buildNavItem(Icons.analytics_rounded, _getLabel(provider.language, 'stats'), 1),
+              _buildNavItem(Icons.person_rounded, _getLabel(provider.language, 'profile'), 2),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    final isActive = _selectedIndex == index;
+    return InkWell(
+      onTap: () {
+        if (index == 0) {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+        } else if (index == 2) {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+        }
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isActive ? const Color(0xFF6C63FF) : Colors.grey,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? const Color(0xFF6C63FF) : Colors.grey,
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getLabel(String language, String key) {
+    final translations = {
+      'ru': {'home': 'Главная', 'stats': 'Статистика', 'profile': 'Профиль'},
+      'en': {'home': 'Home', 'stats': 'Stats', 'profile': 'Profile'},
+    };
+    return translations[language]?[key] ?? translations['ru']![key]!;
   }
 }
