@@ -5,6 +5,10 @@ import '../models/habit.dart';
 
 class HabitProvider with ChangeNotifier {
   List<Habit> _habits = [];
+  String _userName = 'Пользователь';
+  bool _notificationsEnabled = true;
+  bool _isDarkTheme = true;
+  String _language = 'ru';
 
   static const List<String> colors = [
     '#FF6B6B',
@@ -27,9 +31,14 @@ class HabitProvider with ChangeNotifier {
   ];
 
   List<Habit> get habits => _habits;
+  String get userName => _userName;
+  bool get notificationsEnabled => _notificationsEnabled;
+  bool get isDarkTheme => _isDarkTheme;
+  String get language => _language;
 
   HabitProvider() {
     _loadHabits();
+    _loadSettings();
   }
 
   Future<void> _loadHabits() async {
@@ -40,6 +49,44 @@ class HabitProvider with ChangeNotifier {
       _habits = decoded.map((h) => Habit.fromJson(h)).toList();
       notifyListeners();
     }
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    _userName = prefs.getString('userName') ?? 'Пользователь';
+    _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
+    _isDarkTheme = prefs.getBool('isDarkTheme') ?? true;
+    _language = prefs.getString('language') ?? 'ru';
+    notifyListeners();
+  }
+
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userName', _userName);
+    await prefs.setBool('notificationsEnabled', _notificationsEnabled);
+    await prefs.setBool('isDarkTheme', _isDarkTheme);
+    await prefs.setString('language', _language);
+    notifyListeners();
+  }
+
+  void setUserName(String name) {
+    _userName = name;
+    _saveSettings();
+  }
+
+  void toggleNotifications(bool value) {
+    _notificationsEnabled = value;
+    _saveSettings();
+  }
+
+  void toggleTheme(bool isDark) {
+    _isDarkTheme = isDark;
+    _saveSettings();
+  }
+
+  void setLanguage(String lang) {
+    _language = lang;
+    _saveSettings();
   }
 
   Future<void> _saveHabits() async {
