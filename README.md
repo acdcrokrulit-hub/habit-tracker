@@ -31,6 +31,18 @@ flutter pub get
 ```
 
 3. Запустите приложение:
+
+**Web (Chrome):**
+```bash
+flutter run -d chrome
+```
+
+**Windows:**
+```bash
+flutter run -d windows
+```
+
+**Android/iOS (эмулятор):**
 ```bash
 flutter run
 ```
