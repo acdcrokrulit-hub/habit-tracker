@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/habit_provider.dart';
+import '../providers/navigation_provider.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
+import 'calendar_screen.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -12,30 +14,13 @@ class StatsScreen extends StatefulWidget {
   State<StatsScreen> createState() => _StatsScreenState();
 }
 
-class _StatsScreenState extends State<StatsScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  int _selectedIndex = 1;
-
+class _StatsScreenState extends State<StatsScreen> {
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    );
-    _animationController.forward();
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NavigationProvider>().goStats();
+    });
   }
 
   @override
@@ -57,24 +42,22 @@ class _StatsScreenState extends State<StatsScreen>
           child: Column(
             children: [
               Expanded(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildAppBar(),
-                        const SizedBox(height: 24),
-                        _buildHeader(),
-                        const SizedBox(height: 24),
-                        _buildStatsGrid(),
-                        const SizedBox(height: 24),
-                        _buildWeeklyChart(),
-                        const SizedBox(height: 24),
-                        _buildAchievements(),
-                      ],
-                    ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildAppBar(),
+                      const SizedBox(height: 24),
+                      _buildHeader(),
+                      const SizedBox(height: 24),
+                      _buildStatsGrid(),
+                      const SizedBox(height: 24),
+                      _buildWeeklyChart(),
+                      const SizedBox(height: 24),
+                      _buildAchievements(),
+                      const SizedBox(height: 80),
+                    ],
                   ),
                 ),
               ),
@@ -175,9 +158,9 @@ class _StatsScreenState extends State<StatsScreen>
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 1.5,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.6,
           children: [
             _buildStatCard('📊', '${provider.totalHabits}', t['total_habits']!, const Color(0xFFFF6B6B)),
             _buildStatCard('✅', '${provider.completedToday}', t['completed']!, const Color(0xFF4ECDC4)),
@@ -196,7 +179,7 @@ class _StatsScreenState extends State<StatsScreen>
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(20),
@@ -208,21 +191,29 @@ class _StatsScreenState extends State<StatsScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 28)),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+          Text(emoji, style: const TextStyle(fontSize: 24)),
+          const SizedBox(height: 4),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 12,
+          const SizedBox(height: 2),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 10,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ),
         ],
@@ -237,9 +228,36 @@ class _StatsScreenState extends State<StatsScreen>
         final isDark = provider.isDarkTheme;
         final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
         final cardColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
-        
+
         final weeklyData = provider.getWeeklyData();
         final entries = weeklyData.entries.toList();
+
+        if (provider.totalHabits == 0) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3)),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.insights_rounded, size: 64, color: Color(0xFF6C63FF)),
+                const SizedBox(height: 16),
+                Text(
+                  t['no_data']!,
+                  style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  t['no_data_desc']!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 14),
+                ),
+              ],
+            ),
+          );
+        }
 
         return Container(
           padding: const EdgeInsets.all(20),
@@ -258,7 +276,7 @@ class _StatsScreenState extends State<StatsScreen>
                 child: BarChart(
                   BarChartData(
                     alignment: BarChartAlignment.spaceAround,
-                    maxY: provider.totalHabits.toDouble() + 1,
+                    maxY: (provider.totalHabits.toDouble() + 1).clamp(1, 100),
                     barTouchData: BarTouchData(
                       enabled: true,
                       touchTooltipData: BarTouchTooltipData(
@@ -422,28 +440,32 @@ class _StatsScreenState extends State<StatsScreen>
       builder: (context, provider, _) {
         final isDark = provider.isDarkTheme;
         return Container(
-          margin: const EdgeInsets.all(20),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: (isDark ? const Color(0xFF6C63FF) : const Color(0xFF1A1A2E)).withOpacity(0.3),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 20,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: (isDark ? const Color(0xFF6C63FF) : const Color(0xFF1A1A2E)).withOpacity(0.3),
               ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home_rounded, _getLabel(provider.language, 'home'), 0),
-              _buildNavItem(Icons.analytics_rounded, _getLabel(provider.language, 'stats'), 1),
-              _buildNavItem(Icons.person_rounded, _getLabel(provider.language, 'profile'), 2),
-            ],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildNavItem(Icons.home_rounded, _getLabel(provider.language, 'home'), 0),
+                _buildNavItem(Icons.calendar_month_rounded, _getLabel(provider.language, 'calendar'), 1),
+                _buildNavItem(Icons.analytics_rounded, _getLabel(provider.language, 'stats'), 2),
+                _buildNavItem(Icons.person_rounded, _getLabel(provider.language, 'profile'), 3),
+              ],
+            ),
           ),
         );
       },
@@ -451,45 +473,64 @@ class _StatsScreenState extends State<StatsScreen>
   }
 
   Widget _buildNavItem(IconData icon, String label, int index) {
-    final isActive = _selectedIndex == index;
-    return InkWell(
-      onTap: () {
-        if (index == 0) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-        } else if (index == 2) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
-        }
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isActive ? const Color(0xFF6C63FF) : Colors.grey,
-              size: 24,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? const Color(0xFF6C63FF) : Colors.grey,
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+    return Consumer<NavigationProvider>(
+      builder: (context, navProvider, _) {
+        final isActive = navProvider.selectedIndex == index;
+        return Expanded(
+          child: InkWell(
+            onTap: () {
+              if (index == 0) {
+                navProvider.goHome();
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+              } else if (index == 1) {
+                navProvider.goCalendar();
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CalendarScreen()));
+              } else if (index == 2) {
+                // Already on stats screen
+                navProvider.goStats();
+              } else if (index == 3) {
+                navProvider.goProfile();
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    color: isActive ? const Color(0xFF6C63FF) : Colors.grey,
+                    size: 24,
+                  ),
+                  const SizedBox(height: 4),
+                  Flexible(
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isActive ? const Color(0xFF6C63FF) : Colors.grey,
+                        fontSize: 11,
+                        fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   String _getLabel(String language, String key) {
     final translations = {
-      'ru': {'home': 'Главная', 'stats': 'Статистика', 'profile': 'Профиль'},
-      'en': {'home': 'Home', 'stats': 'Stats', 'profile': 'Profile'},
+      'ru': {'home': 'Главная', 'stats': 'Статистика', 'profile': 'Профиль', 'calendar': 'Календарь'},
+      'en': {'home': 'Home', 'stats': 'Stats', 'profile': 'Profile', 'calendar': 'Calendar'},
     };
     return translations[language]?[key] ?? translations['ru']![key]!;
   }
@@ -513,6 +554,8 @@ class _StatsScreenState extends State<StatsScreen>
         'habit_master_desc': 'Create 5 habits',
         'champion': 'Champion',
         'champion_desc': '100% completion today',
+        'no_data': 'No Data',
+        'no_data_desc': 'Add habits to track statistics',
       };
     }
     return {
@@ -532,6 +575,8 @@ class _StatsScreenState extends State<StatsScreen>
       'habit_master_desc': 'Создайте 5 привычек',
       'champion': 'Чемпион',
       'champion_desc': '100% выполнение сегодня',
+      'no_data': 'Нет данных',
+      'no_data_desc': 'Добавьте привычки для отслеживания статистики',
     };
   }
 }

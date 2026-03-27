@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'providers/habit_provider.dart';
+import 'providers/navigation_provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,14 +13,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => HabitProvider(),
-      child: Consumer<HabitProvider>(
-        builder: (context, provider, _) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => HabitProvider()),
+        ChangeNotifierProvider(create: (_) => NavigationProvider()),
+      ],
+      child: Consumer2<HabitProvider, NavigationProvider>(
+        builder: (context, habitProvider, navProvider, _) {
           return MaterialApp(
             title: 'Habit Tracker',
             debugShowCheckedModeBanner: false,
-            theme: provider.isDarkTheme ? _darkTheme : _lightTheme,
+            theme: habitProvider.isDarkTheme ? _darkTheme : _lightTheme,
             home: const HomeScreen(),
           );
         },
@@ -36,7 +40,6 @@ final ThemeData _darkTheme = ThemeData(
     primary: Color(0xFF6C63FF),
     secondary: Color(0xFF4ECDC4),
     surface: Color(0xFF1A1A2E),
-    background: Color(0xFF0F0F1A),
   ),
   fontFamily: 'Poppins',
   appBarTheme: const AppBarTheme(
@@ -58,7 +61,7 @@ final ThemeData _darkTheme = ThemeData(
     ),
   ),
   floatingActionButtonTheme: const FloatingActionButtonThemeData(
-    backgroundColor: const Color(0xFF6C63FF),
+    backgroundColor: Color(0xFF6C63FF),
     foregroundColor: Colors.white,
     elevation: 8,
   ),
@@ -80,7 +83,6 @@ final ThemeData _lightTheme = ThemeData(
     primary: Color(0xFF6C63FF),
     secondary: Color(0xFF4ECDC4),
     surface: Color(0xFFFFFFFF),
-    background: Color(0xFFF5F7FA),
   ),
   fontFamily: 'Poppins',
   appBarTheme: const AppBarTheme(
@@ -103,7 +105,7 @@ final ThemeData _lightTheme = ThemeData(
     ),
   ),
   floatingActionButtonTheme: const FloatingActionButtonThemeData(
-    backgroundColor: const Color(0xFF6C63FF),
+    backgroundColor: Color(0xFF6C63FF),
     foregroundColor: Colors.white,
     elevation: 8,
   ),

@@ -6,6 +6,7 @@ import '../models/habit.dart';
 class HabitProvider with ChangeNotifier {
   List<Habit> _habits = [];
   String _userName = 'Пользователь';
+  String? _profilePhotoPath;
   bool _notificationsEnabled = true;
   bool _isDarkTheme = true;
   String _language = 'ru';
@@ -32,6 +33,7 @@ class HabitProvider with ChangeNotifier {
 
   List<Habit> get habits => _habits;
   String get userName => _userName;
+  String? get profilePhotoPath => _profilePhotoPath;
   bool get notificationsEnabled => _notificationsEnabled;
   bool get isDarkTheme => _isDarkTheme;
   String get language => _language;
@@ -54,6 +56,7 @@ class HabitProvider with ChangeNotifier {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     _userName = prefs.getString('userName') ?? 'Пользователь';
+    _profilePhotoPath = prefs.getString('profilePhotoPath');
     _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
     _isDarkTheme = prefs.getBool('isDarkTheme') ?? true;
     _language = prefs.getString('language') ?? 'ru';
@@ -63,10 +66,21 @@ class HabitProvider with ChangeNotifier {
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('userName', _userName);
+    await prefs.setString('profilePhotoPath', _profilePhotoPath ?? '');
     await prefs.setBool('notificationsEnabled', _notificationsEnabled);
     await prefs.setBool('isDarkTheme', _isDarkTheme);
     await prefs.setString('language', _language);
     notifyListeners();
+  }
+
+  Future<void> setProfilePhoto(String path) async {
+    _profilePhotoPath = path;
+    await _saveSettings();
+  }
+
+  Future<void> removeProfilePhoto() async {
+    _profilePhotoPath = null;
+    await _saveSettings();
   }
 
   void setUserName(String name) {
@@ -96,7 +110,7 @@ class HabitProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void addHabit(String title, String description) {
+  void addHabit(String title, String description, {bool hasProgress = false, double targetValue = 1.0, String unit = 'раз'}) {
     final random = SystemRandom();
     final habit = Habit(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -106,6 +120,9 @@ class HabitProvider with ChangeNotifier {
       icon: icons[random.nextInt(icons.length)],
       completedDates: [],
       createdAt: DateTime.now(),
+      hasProgress: hasProgress,
+      targetValue: targetValue,
+      unit: unit,
     );
     _habits.add(habit);
     _saveHabits();
@@ -114,7 +131,7 @@ class HabitProvider with ChangeNotifier {
   void toggleHabit(String habitId) {
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    
+
     _habits = _habits.map((habit) {
       if (habit.id == habitId) {
         final isCompleted = habit.completedDates.contains(todayStr);
@@ -124,7 +141,7 @@ class HabitProvider with ChangeNotifier {
         } else {
           newDates = [...habit.completedDates, todayStr];
         }
-        
+
         final updatedHabit = habit.copyWith(
           completedDates: newDates,
           streak: _calculateStreak(newDates),
@@ -133,8 +150,123 @@ class HabitProvider with ChangeNotifier {
       }
       return habit;
     }).toList();
-    
+
     _saveHabits();
+  }
+
+  void updateProgress(String habitId, double addedValue) {
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+    _habits = _habits.map((habit) {
+      if (habit.id == habitId && habit.hasProgress) {
+        final currentProgress = habit.progressHistory[todayStr] ?? 0.0;
+        final newProgress = currentProgress + addedValue;
+        
+        final newProgressHistory = Map<String, double>.from(habit.progressHistory);
+        newProgressHistory[todayStr] = newProgress.clamp(0, habit.targetValue);
+
+        List<String> newDates = List<String>.from(habit.completedDates);
+        if (newProgress >= habit.targetValue && !newDates.contains(todayStr)) {
+          newDates.add(todayStr);
+        } else if (newProgress < habit.targetValue && newDates.contains(todayStr)) {
+          newDates.remove(todayStr);
+        }
+
+        final updatedHabit = habit.copyWith(
+          progressHistory: newProgressHistory,
+          completedDates: newDates,
+          streak: _calculateStreak(newDates),
+        );
+        return updatedHabit;
+      }
+      return habit;
+    }).toList();
+
+    _saveHabits();
+  }
+
+  void resetProgress(String habitId) {
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+    _habits = _habits.map((habit) {
+      if (habit.id == habitId && habit.hasProgress) {
+        final newProgressHistory = Map<String, double>.from(habit.progressHistory);
+        newProgressHistory.remove(todayStr);
+
+        final updatedHabit = habit.copyWith(
+          progressHistory: newProgressHistory,
+        );
+        return updatedHabit;
+      }
+      return habit;
+    }).toList();
+
+    _saveHabits();
+  }
+
+  // Отметить привычку за конкретную дату
+  void toggleHabitForDate(String habitId, String dateStr) {
+    _habits = _habits.map((habit) {
+      if (habit.id == habitId) {
+        final isCompleted = habit.completedDates.contains(dateStr);
+        List<String> newDates;
+        if (isCompleted) {
+          newDates = habit.completedDates.where((d) => d != dateStr).toList();
+        } else {
+          newDates = [...habit.completedDates, dateStr];
+        }
+
+        final updatedHabit = habit.copyWith(
+          completedDates: newDates,
+          streak: _calculateStreak(newDates),
+        );
+        return updatedHabit;
+      }
+      return habit;
+    }).toList();
+
+    _saveHabits();
+  }
+
+  // Обновить прогресс за конкретную дату
+  void updateProgressForDate(String habitId, String dateStr, double addedValue) {
+    _habits = _habits.map((habit) {
+      if (habit.id == habitId && habit.hasProgress) {
+        final currentProgress = habit.progressHistory[dateStr] ?? 0.0;
+        final newProgress = currentProgress + addedValue;
+
+        final newProgressHistory = Map<String, double>.from(habit.progressHistory);
+        newProgressHistory[dateStr] = newProgress.clamp(0, habit.targetValue);
+
+        List<String> newDates = List<String>.from(habit.completedDates);
+        if (newProgress >= habit.targetValue && !newDates.contains(dateStr)) {
+          newDates.add(dateStr);
+        } else if (newProgress < habit.targetValue && newDates.contains(dateStr)) {
+          newDates.remove(dateStr);
+        }
+
+        final updatedHabit = habit.copyWith(
+          progressHistory: newProgressHistory,
+          completedDates: newDates,
+          streak: _calculateStreak(newDates),
+        );
+        return updatedHabit;
+      }
+      return habit;
+    }).toList();
+
+    _saveHabits();
+  }
+
+  // Получить привычку по ID
+  Habit? getHabitById(String habitId) {
+    try {
+      return _habits.firstWhere((h) => h.id == habitId);
+    } catch (e) {
+      return null;
+    }
   }
 
   int _calculateStreak(List<String> completedDates) {

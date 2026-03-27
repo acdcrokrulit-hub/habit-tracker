@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/habit_provider.dart';
+import '../providers/navigation_provider.dart';
 import '../widgets/habit_card.dart';
 import '../screens/add_habit_screen.dart';
+import '../screens/edit_habit_screen.dart';
 import '../screens/stats_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/calendar_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,29 +16,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  int _selectedIndex = 0;
-
+class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    );
-    _animationController.forward();
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
+    // Установить индекс 0 при загрузке home экрана
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NavigationProvider>().goHome();
+    });
   }
 
   @override
@@ -44,6 +32,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       body: Consumer<HabitProvider>(
         builder: (context, provider, _) {
           final isDark = provider.isDarkTheme;
+          final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+          final subtextColor = isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF1A1A2E).withOpacity(0.7);
+
           return Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -58,18 +49,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               child: Column(
                 children: [
                   Expanded(
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Column(
-                        children: [
-                          _buildHeader(provider),
-                          Expanded(
-                            child: provider.habits.isEmpty
-                                ? _buildEmptyState(provider)
-                                : _buildHabitsList(provider),
-                          ),
-                        ],
-                      ),
+                    child: Column(
+                      children: [
+                        _buildHeader(provider, textColor, subtextColor),
+                        Expanded(
+                          child: provider.habits.isEmpty
+                              ? _buildEmptyState(provider, textColor, subtextColor)
+                              : _buildHabitsList(provider),
+                        ),
+                      ],
                     ),
                   ),
                   _buildBottomNav(provider),
@@ -85,11 +73,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildHeader(HabitProvider provider) {
+  Widget _buildHeader(HabitProvider provider, Color textColor, Color subtextColor) {
     final t = _getTranslations(provider.language);
-    final isDark = provider.isDarkTheme;
-    final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
-    final subtextColor = isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF1A1A2E).withOpacity(0.7);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -169,6 +154,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           _buildStatItem('✅', '${provider.completedToday}', t['completed']!, provider),
           _buildDivider(provider),
           _buildStatItem('🔥', '${provider.bestStreak}', t['streak']!, provider),
+          _buildDivider(provider),
+          InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CalendarScreen()),
+            ),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6C63FF).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.calendar_month_rounded,
+                color: Color(0xFF6C63FF),
+                size: 24,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -196,11 +201,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildEmptyState(HabitProvider provider) {
+  Widget _buildEmptyState(HabitProvider provider, Color textColor, Color subtextColor) {
     final t = _getTranslations(provider.language);
-    final isDark = provider.isDarkTheme;
-    final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
-    final subtextColor = isDark ? Colors.white.withOpacity(0.6) : const Color(0xFF1A1A2E).withOpacity(0.6);
 
     return Center(
       child: Column(
@@ -219,18 +221,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Text(t['no_habits']!, style: TextStyle(color: textColor, fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           Text(t['add_first']!, textAlign: TextAlign.center, style: TextStyle(color: subtextColor, fontSize: 14)),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddHabitScreen())),
-            icon: const Icon(Icons.add),
-            label: Text(t['add_habit']!),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6C63FF),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-          ),
         ],
       ),
     );
@@ -238,14 +228,90 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildHabitsList(HabitProvider provider) {
     return ListView.builder(
-      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100),
+      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100, top: 10),
       itemCount: provider.habits.length,
       itemBuilder: (context, index) {
         final habit = provider.habits[index];
         return HabitCard(
           habit: habit,
-          onToggle: () => provider.toggleHabit(habit.id),
-          onDelete: () => provider.deleteHabit(habit.id),
+          onToggle: () {
+            try {
+              provider.toggleHabit(habit.id);
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Ошибка при обновлении привычки'),
+                  backgroundColor: Color(0xFFFF6B6B),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          onDelete: () {
+            try {
+              provider.deleteHabit(habit.id);
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Ошибка при удалении привычки'),
+                  backgroundColor: Color(0xFFFF6B6B),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          onEdit: () {
+            try {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => EditHabitScreen(habit: habit)),
+              );
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Ошибка при редактировании'),
+                  backgroundColor: Color(0xFFFF6B6B),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          onAddProgress: habit.hasProgress
+              ? (value) {
+                  try {
+                    if (value < -1000) {
+                      provider.resetProgress(habit.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Прогресс сброшен'),
+                          backgroundColor: const Color(0xFF4ECDC4),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else {
+                      provider.updateProgress(habit.id, value);
+                      final newProgress = habit.getTodayProgress() + value;
+                      if (newProgress >= habit.targetValue) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('🎉 Цель достигнута!'),
+                            backgroundColor: const Color(0xFF4ECDC4),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Ошибка при обновлении прогресса'),
+                        backgroundColor: Color(0xFFFF6B6B),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              : null,
         );
       },
     );
@@ -253,20 +319,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildFab(HabitProvider provider) {
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 90, top: 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [Color(0xFF6C63FF), Color(0xFF4ECDC4)]),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.5), blurRadius: 20, spreadRadius: 2),
+          BoxShadow(
+            color: const Color(0xFF6C63FF).withOpacity(0.5),
+            blurRadius: 20,
+            spreadRadius: 2,
+          ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddHabitScreen())),
-          borderRadius: BorderRadius.circular(16),
-          child: const Padding(padding: EdgeInsets.all(16), child: Icon(Icons.add_rounded, size: 28, color: Colors.white)),
+          borderRadius: BorderRadius.circular(20),
+          child: const Padding(
+            padding: EdgeInsets.all(18),
+            child: Icon(Icons.add_rounded, size: 30, color: Colors.white),
+          ),
         ),
       ),
     );
@@ -275,61 +348,91 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildBottomNav(HabitProvider provider) {
     final isDark = provider.isDarkTheme;
     return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: (isDark ? const Color(0xFF6C63FF) : const Color(0xFF1A1A2E)).withOpacity(0.3)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20)],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(Icons.home_rounded, _getLabel(provider.language, 'home'), 0),
-          _buildNavItem(Icons.analytics_rounded, _getLabel(provider.language, 'stats'), 1),
-          _buildNavItem(Icons.person_rounded, _getLabel(provider.language, 'profile'), 2),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isActive = _selectedIndex == index;
-    return InkWell(
-      onTap: () {
-        if (index == 1) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StatsScreen()));
-        } else if (index == 2) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
-        }
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: isActive ? const Color(0xFF6C63FF) : Colors.grey, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? const Color(0xFF6C63FF) : Colors.grey,
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: (isDark ? const Color(0xFF6C63FF) : const Color(0xFF1A1A2E)).withOpacity(0.3),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildNavItem(Icons.home_rounded, _getLabel(provider.language, 'home'), 0),
+            _buildNavItem(Icons.calendar_month_rounded, _getLabel(provider.language, 'calendar'), 1),
+            _buildNavItem(Icons.analytics_rounded, _getLabel(provider.language, 'stats'), 2),
+            _buildNavItem(Icons.person_rounded, _getLabel(provider.language, 'profile'), 3),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    return Consumer<NavigationProvider>(
+      builder: (context, navProvider, _) {
+        final isActive = navProvider.selectedIndex == index;
+        return Expanded(
+          child: InkWell(
+            onTap: () {
+              if (index == 0) {
+                // Already on home screen
+                navProvider.goHome();
+              } else if (index == 1) {
+                navProvider.goCalendar();
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CalendarScreen()));
+              } else if (index == 2) {
+                navProvider.goStats();
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StatsScreen()));
+              } else if (index == 3) {
+                navProvider.goProfile();
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: isActive ? const Color(0xFF6C63FF) : Colors.grey, size: 24),
+                  const SizedBox(height: 4),
+                  Flexible(
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isActive ? const Color(0xFF6C63FF) : Colors.grey,
+                        fontSize: 11,
+                        fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   String _getLabel(String language, String key) {
     final translations = {
-      'ru': {'home': 'Главная', 'stats': 'Статистика', 'profile': 'Профиль'},
-      'en': {'home': 'Home', 'stats': 'Stats', 'profile': 'Profile'},
+      'ru': {'home': 'Главная', 'stats': 'Статистика', 'profile': 'Профиль', 'calendar': 'Календарь'},
+      'en': {'home': 'Home', 'stats': 'Stats', 'profile': 'Profile', 'calendar': 'Calendar'},
     };
     return translations[language]?[key] ?? translations['ru']![key]!;
   }
