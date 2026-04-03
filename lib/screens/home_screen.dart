@@ -227,91 +227,96 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHabitsList(HabitProvider provider) {
-    return ListView.builder(
-      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100, top: 10),
-      itemCount: provider.habits.length,
-      itemBuilder: (context, index) {
-        final habit = provider.habits[index];
-        return HabitCard(
-          habit: habit,
-          onToggle: () {
-            try {
-              provider.toggleHabit(habit.id);
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Ошибка при обновлении привычки'),
-                  backgroundColor: Color(0xFFFF6B6B),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          },
-          onDelete: () {
-            try {
-              provider.deleteHabit(habit.id);
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Ошибка при удалении привычки'),
-                  backgroundColor: Color(0xFFFF6B6B),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          },
-          onEdit: () {
-            try {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => EditHabitScreen(habit: habit)),
-              );
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Ошибка при редактировании'),
-                  backgroundColor: Color(0xFFFF6B6B),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          },
-          onAddProgress: habit.hasProgress
-              ? (value) {
-                  try {
-                    if (value < -1000) {
-                      provider.resetProgress(habit.id);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Прогресс сброшен'),
-                          backgroundColor: const Color(0xFF4ECDC4),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    } else {
-                      provider.updateProgress(habit.id, value);
-                      final newProgress = habit.getTodayProgress() + value;
-                      if (newProgress >= habit.targetValue) {
+    return Consumer<HabitProvider>(
+      builder: (context, habitProvider, _) {
+        final t = _getTranslations(habitProvider.language);
+        return ListView.builder(
+          padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100, top: 10),
+          itemCount: provider.habits.length,
+          itemBuilder: (context, index) {
+            final habit = provider.habits[index];
+            return HabitCard(
+              habit: habit,
+              onToggle: () {
+                try {
+                  provider.toggleHabit(habit.id);
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(t['error_update']!),
+                      backgroundColor: const Color(0xFFFF6B6B),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+              onDelete: () {
+                try {
+                  provider.deleteHabit(habit.id);
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(t['error_delete']!),
+                      backgroundColor: const Color(0xFFFF6B6B),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+              onEdit: () {
+                try {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => EditHabitScreen(habit: habit)),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(t['error_edit']!),
+                      backgroundColor: const Color(0xFFFF6B6B),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+              onAddProgress: habit.hasProgress
+                  ? (value) {
+                      try {
+                        if (value < -1000) {
+                          provider.resetProgress(habit.id);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(t['progress_reset']!),
+                              backgroundColor: const Color(0xFF4ECDC4),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        } else {
+                          provider.updateProgress(habit.id, value);
+                          final newProgress = habit.getTodayProgress() + value;
+                          if (newProgress >= habit.targetValue) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(t['goal_reached']!),
+                                backgroundColor: const Color(0xFF4ECDC4),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('🎉 Цель достигнута!'),
-                            backgroundColor: const Color(0xFF4ECDC4),
+                            content: Text(t['error_progress']!),
+                            backgroundColor: const Color(0xFFFF6B6B),
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
                       }
                     }
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Ошибка при обновлении прогресса'),
-                        backgroundColor: Color(0xFFFF6B6B),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                }
-              : null,
+                  : null,
+            );
+          },
         );
       },
     );
@@ -448,6 +453,12 @@ class _HomeScreenState extends State<HomeScreen> {
         'no_habits': 'No Habits',
         'add_first': 'Add your first habit\nand start your journey!',
         'add_habit': 'Add Habit',
+        'error_update': 'Error updating habit',
+        'error_delete': 'Error deleting habit',
+        'error_edit': 'Error editing',
+        'progress_reset': 'Progress reset',
+        'goal_reached': '🎉 Goal reached!',
+        'error_progress': 'Error updating progress',
       };
     }
     return {
@@ -459,6 +470,12 @@ class _HomeScreenState extends State<HomeScreen> {
       'no_habits': 'Нет привычек',
       'add_first': 'Добавьте первую привычку\nи начните свой путь к успеху!',
       'add_habit': 'Добавить привычку',
+      'error_update': 'Ошибка при обновлении привычки',
+      'error_delete': 'Ошибка при удалении привычки',
+      'error_edit': 'Ошибка при редактировании',
+      'progress_reset': 'Прогресс сброшен',
+      'goal_reached': '🎉 Цель достигнута!',
+      'error_progress': 'Ошибка при обновлении прогресса',
     };
   }
 }

@@ -179,7 +179,7 @@ class _StatsScreenState extends State<StatsScreen> {
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(20),
@@ -191,26 +191,27 @@ class _StatsScreenState extends State<StatsScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 24)),
-          const SizedBox(height: 4),
+          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(height: 2),
           Flexible(
             child: Text(
               value,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
               overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
           const SizedBox(height: 2),
           Flexible(
             child: Text(
               label,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
-                fontSize: 10,
+              style: const TextStyle(
+                color: Color(0xFFAAAAAA),
+                fontSize: 9,
               ),
               overflow: TextOverflow.ellipsis,
               maxLines: 2,

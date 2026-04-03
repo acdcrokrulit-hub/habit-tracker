@@ -118,38 +118,43 @@ class _HabitCardState extends State<HabitCard> {
                   ],
                 ),
                 // Статистика за неделю и месяц
-                Row(
-                  children: [
-                    _buildMiniStat('📅', '${widget.habit.getWeekCompletions()}/7', 'Неделя'),
-                    const SizedBox(width: 16),
-                    _buildMiniStat('📊', '${widget.habit.getMonthCompletions()}', 'Месяц'),
-                    const SizedBox(width: 16),
-                    _buildMiniStat('🔥', '${widget.habit.getBestStreak()}', 'Лучшая'),
-                    const Spacer(),
-                    InkWell(
-                      onTap: () => setState(() => _showStats = !_showStats),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              'Статистика',
-                              style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+                Consumer<HabitProvider>(
+                  builder: (context, habitProvider, _) {
+                    final t = _getTranslations(habitProvider.language);
+                    return Row(
+                      children: [
+                        _buildMiniStat('📅', '${widget.habit.getWeekCompletions()}/7', t['week']!),
+                        const SizedBox(width: 16),
+                        _buildMiniStat('📊', '${widget.habit.getMonthCompletions()}', t['month']!),
+                        const SizedBox(width: 16),
+                        _buildMiniStat('🔥', '${widget.habit.getBestStreak()}', t['best']!),
+                        const Spacer(),
+                        InkWell(
+                          onTap: () => setState(() => _showStats = !_showStats),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            Icon(
-                              _showStats ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                              color: color,
-                              size: 16,
+                            child: Row(
+                              children: [
+                                Text(
+                                  t['stats']!,
+                                  style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                                Icon(
+                                  _showStats ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                  color: color,
+                                  size: 16,
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
                 if (_showStats) ...[
                   const SizedBox(height: 12),
@@ -304,7 +309,9 @@ class _HabitCardState extends State<HabitCard> {
           _showPastDateDialog(color);
         }
       },
-      itemBuilder: (context) => [
+      itemBuilder: (context) {
+        final t = _getTranslations(HabitProvider.of(context).language);
+        return [
         PopupMenuItem(
           value: 'past_date',
           child: Row(
@@ -314,9 +321,9 @@ class _HabitCardState extends State<HabitCard> {
                 color: color,
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Отметить за дату',
-                style: TextStyle(color: Colors.white),
+              Text(
+                t['mark_date']!,
+                style: const TextStyle(color: Colors.white),
               ),
             ],
           ),
@@ -331,9 +338,9 @@ class _HabitCardState extends State<HabitCard> {
                   color: color,
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'Сбросить прогресс',
-                  style: TextStyle(color: Colors.white),
+                Text(
+                  t['reset_progress']!,
+                  style: const TextStyle(color: Colors.white),
                 ),
               ],
             ),
@@ -347,9 +354,9 @@ class _HabitCardState extends State<HabitCard> {
                 color: color,
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Редактировать',
-                style: TextStyle(color: Colors.white),
+              Text(
+                t['edit']!,
+                style: const TextStyle(color: Colors.white),
               ),
             ],
           ),
@@ -363,14 +370,15 @@ class _HabitCardState extends State<HabitCard> {
                 color: color,
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Удалить',
-                style: TextStyle(color: Colors.white),
+              Text(
+                t['delete']!,
+                style: const TextStyle(color: Colors.white),
               ),
             ],
           ),
         ),
-      ],
+      ];
+    },
     );
   }
 
@@ -391,32 +399,37 @@ class _HabitCardState extends State<HabitCard> {
   }
 
   Widget _buildDetailedStats(Color color) {
-    final bestStreak = widget.habit.getBestStreak();
-    final currentStreak = widget.habit.streak;
-    final totalCompletions = widget.habit.completedDates.length;
-    final completionRate = widget.habit.completedDates.isNotEmpty
-        ? ((widget.habit.getWeekCompletions() / 7) * 100).round()
-        : 0;
+    return Consumer<HabitProvider>(
+      builder: (context, habitProvider, _) {
+        final t = _getTranslations(habitProvider.language);
+        final bestStreak = widget.habit.getBestStreak();
+        final currentStreak = widget.habit.streak;
+        final totalCompletions = widget.habit.completedDates.length;
+        final completionRate = widget.habit.completedDates.isNotEmpty
+            ? ((widget.habit.getWeekCompletions() / 7) * 100).round()
+            : 0;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
             children: [
-              _buildDetailStatItem('🎯', '$totalCompletions', 'Всего'),
-              _buildDetailStatItem('🔥', '$currentStreak', 'Текущая'),
-              _buildDetailStatItem('⭐', '$bestStreak', 'Рекорд'),
-              _buildDetailStatItem('📈', '$completionRate%', 'За неделю'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildDetailStatItem('🎯', '$totalCompletions', t['total']!),
+                  _buildDetailStatItem('🔥', '$currentStreak', t['current']!),
+                  _buildDetailStatItem('⭐', '$bestStreak', t['record']!),
+                  _buildDetailStatItem('📈', '$completionRate%', t['weekly']!),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -442,72 +455,73 @@ class _HabitCardState extends State<HabitCard> {
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A2E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Выберите дату',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: SizedBox(
-            width: 300,
-            child: SingleChildScrollView(
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  colorScheme: const ColorScheme.dark(
-                    primary: Color(0xFF6C63FF),
-                    onSurface: Colors.white,
-                    surface: Color(0xFF1A1A2E),
+      builder: (context) {
+        final t = _getTranslations(HabitProvider.of(context).language);
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              t['select_date']!,
+              style: const TextStyle(color: Colors.white),
+            ),
+            content: SizedBox(
+              width: 300,
+              child: SingleChildScrollView(
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: const ColorScheme.dark(
+                      primary: Color(0xFF6C63FF),
+                      onSurface: Colors.white,
+                      surface: Color(0xFF1A1A2E),
+                    ),
+                  ),
+                  child: CalendarDatePicker(
+                    initialDate: selectedDate,
+                    firstDate: widget.habit.createdAt,
+                    lastDate: DateTime.now(),
+                    onDateChanged: (date) {
+                      setDialogState(() => selectedDate = date);
+                    },
                   ),
                 ),
-                child: CalendarDatePicker(
-                  initialDate: selectedDate,
-                  firstDate: widget.habit.createdAt,
-                  lastDate: DateTime.now(),
-                  onDateChanged: (date) {
-                    setDialogState(() => selectedDate = date);
-                  },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(t['cancel']!, style: TextStyle(color: Colors.white.withOpacity(0.7))),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+                onPressed: () {
+                  final dateStr = '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
+
+                  if (widget.habit.hasProgress && widget.onAddProgress != null) {
+                    Navigator.pop(context);
+                    _showProgressDialog(color, dateStr);
+                  } else {
+                    final provider = context.read<HabitProvider>();
+                    provider.toggleHabitForDate(widget.habit.id, dateStr);
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('✅ ${t['mark']} ${selectedDate!.day}.${selectedDate!.month}.${selectedDate!.year}'),
+                        backgroundColor: const Color(0xFF4ECDC4),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+                child: Text(t['mark']!, style: const TextStyle(color: Colors.white)),
               ),
-            ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Отмена', style: TextStyle(color: Colors.white.withOpacity(0.7))),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () {
-                final dateStr = '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
-                
-                if (widget.habit.hasProgress && widget.onAddProgress != null) {
-                  // Для привычек с прогрессом показываем диалог ввода значения
-                  Navigator.pop(context);
-                  _showProgressDialog(color, dateStr);
-                } else {
-                  // Для обычных привычек используем provider для отметки за дату
-                  final provider = context.read<HabitProvider>();
-                  provider.toggleHabitForDate(widget.habit.id, dateStr);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('✅ Отмечено за ${selectedDate!.day}.${selectedDate!.month}.${selectedDate!.year}'),
-                      backgroundColor: const Color(0xFF4ECDC4),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              child: const Text('Отметить', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -517,58 +531,61 @@ class _HabitCardState extends State<HabitCard> {
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A2E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Прогресс за ${dateStr.split('-').reversed.join('.')}',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Текущий: ${tempProgress.toStringAsFixed(0)} / ${widget.habit.targetValue.toStringAsFixed(0)} ${widget.habit.unit}',
-                style: TextStyle(color: Colors.white.withOpacity(0.8)),
+      builder: (context) {
+        final t = _getTranslations(HabitProvider.of(context).language);
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              '${t['progress_for']} ${dateStr.split('-').reversed.join('.')}',
+              style: const TextStyle(color: Colors.white),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${t['current_val']}: ${tempProgress.toStringAsFixed(0)} / ${widget.habit.targetValue.toStringAsFixed(0)} ${widget.habit.unit}',
+                  style: TextStyle(color: Colors.white.withOpacity(0.8)),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildProgressButtonDialog(color, -widget.habit.targetValue * 0.25, '-25%', setDialogState, tempProgress, dateStr),
+                    _buildProgressButtonDialog(color, widget.habit.targetValue * 0.1, '+10%', setDialogState, tempProgress, dateStr),
+                    _buildProgressButtonDialog(color, widget.habit.targetValue * 0.25, '+25%', setDialogState, tempProgress, dateStr),
+                    _buildProgressButtonDialog(color, widget.habit.targetValue * 0.5, '+50%', setDialogState, tempProgress, dateStr),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(t['cancel']!, style: TextStyle(color: Colors.white.withOpacity(0.7))),
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildProgressButtonDialog(color, -widget.habit.targetValue * 0.25, '-25%', setDialogState, tempProgress, dateStr),
-                  _buildProgressButtonDialog(color, widget.habit.targetValue * 0.1, '+10%', setDialogState, tempProgress, dateStr),
-                  _buildProgressButtonDialog(color, widget.habit.targetValue * 0.25, '+25%', setDialogState, tempProgress, dateStr),
-                  _buildProgressButtonDialog(color, widget.habit.targetValue * 0.5, '+50%', setDialogState, tempProgress, dateStr),
-                ],
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ ${t['mark']} ${dateStr.split('-').reversed.join('.')}'),
+                      backgroundColor: const Color(0xFF4ECDC4),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                child: Text(t['done']!, style: const TextStyle(color: Colors.white)),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Отмена', style: TextStyle(color: Colors.white.withOpacity(0.7))),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('✅ Прогресс обновлён за ${dateStr.split('-').reversed.join('.')}'),
-                    backgroundColor: const Color(0xFF4ECDC4),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              child: const Text('Готово', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -597,5 +614,50 @@ class _HabitCardState extends State<HabitCard> {
         ),
       ),
     );
+  }
+
+  Map<String, String> _getTranslations(String language) {
+    if (language == 'en') {
+      return {
+        'week': 'Week',
+        'month': 'Month',
+        'best': 'Best',
+        'stats': 'Stats',
+        'mark_date': 'Mark for date',
+        'reset_progress': 'Reset progress',
+        'edit': 'Edit',
+        'delete': 'Delete',
+        'total': 'Total',
+        'current': 'Current',
+        'record': 'Record',
+        'weekly': 'Weekly',
+        'select_date': 'Select date',
+        'cancel': 'Cancel',
+        'mark': 'Mark',
+        'progress_for': 'Progress for',
+        'current_val': 'Current',
+        'done': 'Done',
+      };
+    }
+    return {
+      'week': 'Неделя',
+      'month': 'Месяц',
+      'best': 'Лучшая',
+      'stats': 'Статистика',
+      'mark_date': 'Отметить за дату',
+      'reset_progress': 'Сбросить прогресс',
+      'edit': 'Редактировать',
+      'delete': 'Удалить',
+      'total': 'Всего',
+      'current': 'Текущая',
+      'record': 'Рекорд',
+      'weekly': 'За неделю',
+      'select_date': 'Выберите дату',
+      'cancel': 'Отмена',
+      'mark': 'Отметить',
+      'progress_for': 'Прогресс за',
+      'current_val': 'Текущий',
+      'done': 'Готово',
+    };
   }
 }
