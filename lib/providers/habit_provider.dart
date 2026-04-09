@@ -311,6 +311,11 @@ class HabitProvider with ChangeNotifier {
     return _habits.where((h) => h.completedDates.contains(todayStr)).length;
   }
 
+  int completedForDate(DateTime date) {
+    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return _habits.where((h) => h.completedDates.contains(dateStr)).length;
+  }
+
   int get totalHabits => _habits.length;
 
   int get completionRate {

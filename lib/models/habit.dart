@@ -101,15 +101,29 @@ class Habit {
     return completedDates.contains(todayStr);
   }
 
+  bool isCompletedForDate(DateTime date) {
+    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return completedDates.contains(dateStr);
+  }
+
+  String _getDateStr(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
   double getTodayProgress() {
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     return progressHistory[todayStr] ?? 0.0;
   }
 
-  double getProgressPercentage() {
-    if (!hasProgress || targetValue <= 0) return isCompletedToday() ? 100 : 0;
-    return (getTodayProgress() / targetValue * 100).clamp(0, 100);
+  double getProgressForDateValue(DateTime date) {
+    final dateStr = _getDateStr(date);
+    return progressHistory[dateStr] ?? 0.0;
+  }
+
+  double getProgressPercentageForDate(DateTime date) {
+    if (!hasProgress || targetValue <= 0) return isCompletedForDate(date) ? 100 : 0;
+    return (getProgressForDateValue(date) / targetValue * 100).clamp(0, 100);
   }
 
   int calculateStreak() {

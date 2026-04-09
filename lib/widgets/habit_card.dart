@@ -5,6 +5,7 @@ import '../models/habit.dart';
 
 class HabitCard extends StatefulWidget {
   final Habit habit;
+  final DateTime? viewDate;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
   final VoidCallback? onEdit;
@@ -13,6 +14,7 @@ class HabitCard extends StatefulWidget {
   const HabitCard({
     super.key,
     required this.habit,
+    this.viewDate,
     required this.onToggle,
     required this.onDelete,
     this.onEdit,
@@ -34,11 +36,12 @@ class _HabitCardState extends State<HabitCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isCompleted = widget.habit.isCompletedToday();
+    final date = widget.viewDate ?? DateTime.now();
+    final isCompleted = widget.habit.isCompletedForDate(date);
     final color = _hexToColor(widget.habit.color);
     final hasProgress = widget.habit.hasProgress;
-    final progress = hasProgress ? widget.habit.getTodayProgress() : 0.0;
-    final progressPercent = hasProgress ? widget.habit.getProgressPercentage() : (isCompleted ? 100.0 : 0.0);
+    final progress = hasProgress ? widget.habit.getProgressForDateValue(date) : 0.0;
+    final progressPercent = hasProgress ? widget.habit.getProgressPercentageForDate(date) : (isCompleted ? 100.0 : 0.0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -121,38 +124,47 @@ class _HabitCardState extends State<HabitCard> {
                 Consumer<HabitProvider>(
                   builder: (context, habitProvider, _) {
                     final t = _getTranslations(habitProvider.language);
-                    return Row(
-                      children: [
-                        _buildMiniStat('📅', '${widget.habit.getWeekCompletions()}/7', t['week']!),
-                        const SizedBox(width: 16),
-                        _buildMiniStat('📊', '${widget.habit.getMonthCompletions()}', t['month']!),
-                        const SizedBox(width: 16),
-                        _buildMiniStat('🔥', '${widget.habit.getBestStreak()}', t['best']!),
-                        const Spacer(),
-                        InkWell(
-                          onTap: () => setState(() => _showStats = !_showStats),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _buildMiniStat('📅', '${widget.habit.getWeekCompletions()}/7', t['week']!),
+                                  _buildMiniStat('📊', '${widget.habit.getMonthCompletions()}', t['month']!),
+                                  _buildMiniStat('🔥', '${widget.habit.getBestStreak()}', t['best']!),
+                                ],
+                              ),
                             ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  t['stats']!,
-                                  style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+                            InkWell(
+                              onTap: () => setState(() => _showStats = !_showStats),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: color.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                Icon(
-                                  _showStats ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                  color: color,
-                                  size: 16,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      t['stats']!,
+                                      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+                                    ),
+                                    Icon(
+                                      _showStats ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                      color: color,
+                                      size: 16,
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
+                          ],
+                        );
+                      },
                     );
                   },
                 ),
@@ -310,7 +322,7 @@ class _HabitCardState extends State<HabitCard> {
         }
       },
       itemBuilder: (context) {
-        final t = _getTranslations(HabitProvider.of(context).language);
+        final t = _getTranslations(context.read<HabitProvider>().language);
         return [
         PopupMenuItem(
           value: 'past_date',
@@ -456,7 +468,7 @@ class _HabitCardState extends State<HabitCard> {
     showDialog(
       context: context,
       builder: (context) {
-        final t = _getTranslations(HabitProvider.of(context).language);
+        final t = _getTranslations(context.read<HabitProvider>().language);
         return StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
             backgroundColor: const Color(0xFF1A1A2E),
@@ -479,7 +491,7 @@ class _HabitCardState extends State<HabitCard> {
                   child: CalendarDatePicker(
                     initialDate: selectedDate,
                     firstDate: widget.habit.createdAt,
-                    lastDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 1)),
                     onDateChanged: (date) {
                       setDialogState(() => selectedDate = date);
                     },
@@ -507,6 +519,8 @@ class _HabitCardState extends State<HabitCard> {
                     final provider = context.read<HabitProvider>();
                     provider.toggleHabitForDate(widget.habit.id, dateStr);
                     Navigator.pop(context);
+                    // Refresh the UI
+                    setState(() {});
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('✅ ${t['mark']} ${selectedDate!.day}.${selectedDate!.month}.${selectedDate!.year}'),
@@ -532,7 +546,7 @@ class _HabitCardState extends State<HabitCard> {
     showDialog(
       context: context,
       builder: (context) {
-        final t = _getTranslations(HabitProvider.of(context).language);
+        final t = _getTranslations(context.read<HabitProvider>().language);
         return StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
             backgroundColor: const Color(0xFF1A1A2E),
@@ -572,6 +586,8 @@ class _HabitCardState extends State<HabitCard> {
                 ),
                 onPressed: () {
                   Navigator.pop(context);
+                  // Refresh the UI
+                  setState(() {});
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('✅ ${t['mark']} ${dateStr.split('-').reversed.join('.')}'),

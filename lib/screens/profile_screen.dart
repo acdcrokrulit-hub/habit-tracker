@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import '../providers/habit_provider.dart';
 import '../providers/navigation_provider.dart';
@@ -35,8 +36,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final XFile? photo = await _picker.pickImage(source: ImageSource.gallery);
       if (photo != null) {
+        // Copy the image to app documents directory to prevent temp file deletion
+        final appDir = await getApplicationDocumentsDirectory();
+        final profilePhotosDir = Directory('${appDir.path}/profile_photos');
+        if (!await profilePhotosDir.exists()) {
+          await profilePhotosDir.create(recursive: true);
+        }
+        
+        final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final permanentPath = '${profilePhotosDir.path}/$fileName';
+        await File(photo.path).copy(permanentPath);
+        
         final provider = Provider.of<HabitProvider>(context, listen: false);
-        await provider.setProfilePhoto(photo.path);
+        await provider.setProfilePhoto(permanentPath);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -51,9 +63,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ошибка при загрузке фото'),
-            backgroundColor: Color(0xFFFF6B6B),
+          SnackBar(
+            content: Text(_getTranslations(Provider.of<HabitProvider>(context, listen: false).language)['photo_error']!),
+            backgroundColor: const Color(0xFFFF6B6B),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -639,6 +651,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'about': 'About',
         'photo_saved': 'Photo saved! ✓',
         'photo_removed': 'Photo removed',
+        'photo_error': 'Error loading photo',
       };
     }
     return {
@@ -661,6 +674,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'about': 'О приложении',
       'photo_saved': 'Фото сохранено! ✓',
       'photo_removed': 'Фото удалено',
+      'photo_error': 'Ошибка при загрузке фото',
     };
   }
 }

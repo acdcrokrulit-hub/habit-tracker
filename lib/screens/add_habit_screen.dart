@@ -84,7 +84,32 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
   }
 
   Map<String, String> _getTranslations(String language) {
-    // Always return Russian translations for notifications
+    if (language == 'en') {
+      return {
+        'new_habit': 'New Habit',
+        'create_habit': 'Create Habit',
+        'start_journey': 'Start your journey to success!',
+        'title': 'Title',
+        'title_hint': 'e.g., Drink water',
+        'description': 'Description',
+        'description_hint': 'e.g., 2 liters of water daily',
+        'progress_tracking': 'Progress Tracking',
+        'progress_desc': 'For habits with quantity (water, steps, etc.)',
+        'progress_settings': 'Progress Settings',
+        'goal': 'Goal',
+        'goal_hint': 'e.g., 2000',
+        'unit': 'Unit',
+        'goal_example': 'e.g., Goal 2000 ml = 2 liters of water per day',
+        'tip': 'Tip',
+        'tip_text': 'Start with small habits. Better to do them regularly than set too ambitious goals.',
+        'create': 'Create Habit',
+        'enter_title': 'Enter habit title',
+        'invalid_goal': 'Enter a valid goal value',
+        'habit_created_progress': 'Habit with progress created! 📊',
+        'habit_created': 'Habit successfully created! 🎉',
+        'fill_fields': 'Please fill in all required fields',
+      };
+    }
     return {
       'new_habit': 'Новая привычка',
       'create_habit': 'Создайте привычку',
@@ -229,21 +254,21 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
           ),
         ],
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.add_task_rounded,
             color: Colors.white,
             size: 40,
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Create Habit',
-                  style: TextStyle(
+                  t['create_habit']!,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -251,8 +276,8 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Start your journey!',
-                  style: TextStyle(
+                  t['start_journey']!,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
                   ),
@@ -400,7 +425,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
               Switch(
                 value: _hasProgress,
                 onChanged: (value) => setState(() => _hasProgress = value),
-                activeColor: const Color(0xFF6C63FF),
+                activeThumbColor: const Color(0xFF6C63FF),
               ),
             ],
           ),
@@ -464,7 +489,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                         ),
                       ),
                       child: DropdownButtonFormField<String>(
-                        value: _selectedUnit,
+                        initialValue: _selectedUnit,
                         dropdownColor: const Color(0xFF1A1A2E),
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
@@ -602,7 +627,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
         try {
           targetValue = double.parse(_targetController.text.trim());
           if (targetValue <= 0) {
-            throw FormatException();
+            throw const FormatException();
           }
         } catch (e) {
           ScaffoldMessenger.of(context).showSnackBar(

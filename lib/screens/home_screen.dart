@@ -17,6 +17,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  DateTime _selectedDate = DateTime.now();
+
   @override
   void initState() {
     super.initState();
@@ -24,6 +26,35 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NavigationProvider>().goHome();
     });
+  }
+
+  void _changeDate(int days) {
+    setState(() {
+      _selectedDate = _selectedDate.add(Duration(days: days));
+      // Don't allow future dates
+      if (_selectedDate.isAfter(DateTime.now())) {
+        _selectedDate = DateTime.now();
+      }
+    });
+  }
+
+  String _formatDate(DateTime date, String language) {
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final yesterdayStr = '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
+    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+    if (dateStr == todayStr) {
+      return language == 'en' ? 'Today' : 'Сегодня';
+    } else if (dateStr == yesterdayStr) {
+      return language == 'en' ? 'Yesterday' : 'Вчера';
+    } else {
+      final months = language == 'en'
+          ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+          : ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+      return '${date.day} ${months[date.month - 1]}';
+    }
   }
 
   @override
@@ -75,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHeader(HabitProvider provider, Color textColor, Color subtextColor) {
     final t = _getTranslations(provider.language);
+    final isToday = _isSameDay(_selectedDate, DateTime.now());
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -88,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    t['good_day']!,
+                    isToday ? t['good_day']! : _formatDate(_selectedDate, provider.language),
                     style: TextStyle(color: subtextColor, fontSize: 14),
                   ),
                   const SizedBox(height: 4),
@@ -105,15 +137,88 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildProgressCircle(provider),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
+          _buildDateNavigator(),
+          const SizedBox(height: 12),
           _buildQuickStats(provider, t),
         ],
       ),
     );
   }
 
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  Widget _buildDateNavigator() {
+    return Consumer<HabitProvider>(
+      builder: (context, provider, _) {
+        final isDark = provider.isDarkTheme;
+        final isToday = _isSameDay(_selectedDate, DateTime.now());
+        return Row(
+          children: [
+            InkWell(
+              onTap: () => _changeDate(-1),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3)),
+                ),
+                child: const Icon(Icons.chevron_left_rounded, color: Color(0xFF6C63FF), size: 24),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Center(
+                child: Text(
+                  _formatDate(_selectedDate, provider.language),
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            if (!isToday)
+              InkWell(
+                onTap: () => _changeDate(1),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3)),
+                  ),
+                  child: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6C63FF), size: 24),
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6C63FF).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  provider.language == 'en' ? 'Today' : 'Сегодня',
+                  style: const TextStyle(color: Color(0xFF6C63FF), fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildProgressCircle(HabitProvider provider) {
-    final percentage = provider.totalHabits > 0 ? (provider.completedToday / provider.totalHabits) : 0.0;
+    final completed = provider.completedForDate(_selectedDate);
+    final percentage = provider.totalHabits > 0 ? (completed / provider.totalHabits) : 0.0;
     return Container(
       width: 60,
       height: 60,
@@ -139,6 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildQuickStats(HabitProvider provider, Map<String, String> t) {
     final isDark = provider.isDarkTheme;
+    final completed = provider.completedForDate(_selectedDate);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -151,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildStatItem('📊', '${provider.totalHabits}', t['total']!, provider),
           _buildDivider(provider),
-          _buildStatItem('✅', '${provider.completedToday}', t['completed']!, provider),
+          _buildStatItem('✅', '$completed', t['completed']!, provider),
           _buildDivider(provider),
           _buildStatItem('🔥', '${provider.bestStreak}', t['streak']!, provider),
           _buildDivider(provider),
@@ -227,96 +333,98 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHabitsList(HabitProvider provider) {
-    return Consumer<HabitProvider>(
-      builder: (context, habitProvider, _) {
-        final t = _getTranslations(habitProvider.language);
-        return ListView.builder(
-          padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100, top: 10),
-          itemCount: provider.habits.length,
-          itemBuilder: (context, index) {
-            final habit = provider.habits[index];
-            return HabitCard(
-              habit: habit,
-              onToggle: () {
-                try {
-                  provider.toggleHabit(habit.id);
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(t['error_update']!),
-                      backgroundColor: const Color(0xFFFF6B6B),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              onDelete: () {
-                try {
-                  provider.deleteHabit(habit.id);
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(t['error_delete']!),
-                      backgroundColor: const Color(0xFFFF6B6B),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              onEdit: () {
-                try {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => EditHabitScreen(habit: habit)),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(t['error_edit']!),
-                      backgroundColor: const Color(0xFFFF6B6B),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              onAddProgress: habit.hasProgress
-                  ? (value) {
-                      try {
-                        if (value < -1000) {
-                          provider.resetProgress(habit.id);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(t['progress_reset']!),
-                              backgroundColor: const Color(0xFF4ECDC4),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        } else {
-                          provider.updateProgress(habit.id, value);
-                          final newProgress = habit.getTodayProgress() + value;
-                          if (newProgress >= habit.targetValue) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(t['goal_reached']!),
-                                backgroundColor: const Color(0xFF4ECDC4),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        }
-                      } catch (e) {
+    final t = _getTranslations(provider.language);
+    final dateStr = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+    return ListView.builder(
+      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100, top: 10),
+      itemCount: provider.habits.length,
+      itemBuilder: (context, index) {
+        final habit = provider.habits[index];
+        return HabitCard(
+          habit: habit,
+          viewDate: _selectedDate,
+          onToggle: () {
+            try {
+              provider.toggleHabitForDate(habit.id, dateStr);
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(t['error_update']!),
+                  backgroundColor: const Color(0xFFFF6B6B),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          onDelete: () {
+            try {
+              provider.deleteHabit(habit.id);
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(t['error_delete']!),
+                  backgroundColor: const Color(0xFFFF6B6B),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          onEdit: () {
+            try {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => EditHabitScreen(habit: habit)),
+              );
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(t['error_edit']!),
+                  backgroundColor: const Color(0xFFFF6B6B),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          onAddProgress: habit.hasProgress
+              ? (value) {
+                  try {
+                    if (value < -1000) {
+                      // Reset progress for the selected date
+                      final newProgressHistory = Map<String, double>.from(habit.progressHistory);
+                      newProgressHistory.remove(dateStr);
+                      final updatedHabit = habit.copyWith(progressHistory: newProgressHistory);
+                      provider.updateHabit(updatedHabit);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(t['progress_reset']!),
+                          backgroundColor: const Color(0xFF4ECDC4),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else {
+                      provider.updateProgressForDate(habit.id, dateStr, value);
+                      final newProgress = habit.getProgressForDateValue(_selectedDate) + value;
+                      if (newProgress >= habit.targetValue) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(t['error_progress']!),
-                            backgroundColor: const Color(0xFFFF6B6B),
+                            content: Text(t['goal_reached']!),
+                            backgroundColor: const Color(0xFF4ECDC4),
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
                       }
                     }
-                  : null,
-            );
-          },
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(t['error_progress']!),
+                        backgroundColor: const Color(0xFFFF6B6B),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              : null,
         );
       },
     );
