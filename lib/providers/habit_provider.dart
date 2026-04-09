@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/habit.dart';
 
@@ -111,7 +112,7 @@ class HabitProvider with ChangeNotifier {
   }
 
   void addHabit(String title, String description, {bool hasProgress = false, double targetValue = 1.0, String unit = 'раз'}) {
-    final random = SystemRandom();
+    final random = math.Random();
     final habit = Habit(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
@@ -331,24 +332,16 @@ class HabitProvider with ChangeNotifier {
   Map<String, int> getWeeklyData() {
     final Map<String, int> weeklyData = {};
     final now = DateTime.now();
-    
+
     for (int i = 6; i >= 0; i--) {
       final date = now.subtract(Duration(days: i));
       final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      final dayName = date.weekday == 1 
-          ? 'Пн' 
-          : date.weekday == 2 
-              ? 'Вт' 
-              : date.weekday == 3 
-                  ? 'Ср' 
-                  : date.weekday == 4 
-                      ? 'Чт' 
-                      : date.weekday == 5 
-                          ? 'Пт' 
-                          : date.weekday == 6 
-                              ? 'Сб' 
-                              : 'Вс';
-      
+      final dayNamesRu = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+      final dayNamesEn = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      final dayName = _language == 'en' 
+          ? dayNamesEn[date.weekday - 1] 
+          : dayNamesRu[date.weekday - 1];
+
       int completed = 0;
       for (final habit in _habits) {
         if (habit.completedDates.contains(dateStr)) {
@@ -357,17 +350,185 @@ class HabitProvider with ChangeNotifier {
       }
       weeklyData[dayName] = completed;
     }
-    
+
     return weeklyData;
   }
-}
 
-class SystemRandom {
-  final _random = DateTime.now().millisecondsSinceEpoch;
-  int _counter = 0;
-  
-  int nextInt(int max) {
-    _counter++;
-    return (_random + _counter) % max;
+  // Получить данные за месяц (для линейного графика тренда)
+  Map<String, double> getMonthlyTrendData() {
+    final Map<String, double> trendData = {};
+    final now = DateTime.now();
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+
+    for (int day = 1; day <= daysInMonth; day++) {
+      final date = DateTime(now.year, now.month, day);
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      
+      int completed = 0;
+      for (final habit in _habits) {
+        if (habit.completedDates.contains(dateStr)) {
+          completed++;
+        }
+      }
+      
+      final percentage = _habits.isEmpty ? 0.0 : (completed.toDouble() / _habits.length.toDouble()) * 100.0;
+      trendData[day.toString()] = percentage;
+    }
+
+    return trendData;
+  }
+
+  // Получить лучший день недели
+  Map<String, dynamic> getBestDayOfWeek() {
+    final Map<String, int> dayCounts = {
+      'Пн': 0, 'Вт': 0, 'Ср': 0, 'Чт': 0, 'Пт': 0, 'Сб': 0, 'Вс': 0
+    };
+    final Map<String, int> dayOccurrences = {
+      'Пн': 0, 'Вт': 0, 'Ср': 0, 'Чт': 0, 'Пт': 0, 'Сб': 0, 'Вс': 0
+    };
+
+    for (final habit in _habits) {
+      for (final dateStr in habit.completedDates) {
+        final date = DateTime.parse(dateStr);
+        final dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+        final dayName = dayNames[date.weekday - 1];
+        dayCounts[dayName] = (dayCounts[dayName] ?? 0) + 1;
+        dayOccurrences[dayName] = (dayOccurrences[dayName] ?? 0) + 1;
+      }
+    }
+
+    String bestDay = 'Пн';
+    int maxCount = 0;
+    for (final entry in dayCounts.entries) {
+      if (entry.value > maxCount) {
+        maxCount = entry.value;
+        bestDay = entry.key;
+      }
+    }
+
+    return {'day': bestDay, 'count': maxCount};
+  }
+
+  // Получить инсайты на основе данных
+  List<Map<String, dynamic>> getInsights() {
+    final List<Map<String, dynamic>> insights = [];
+    
+    if (_habits.isEmpty) return insights;
+
+    // Инсайт 1: Общая статистика
+    final totalCompletions = _habits.fold<int>(0, (sum, h) => sum + h.completedDates.length);
+    if (totalCompletions > 0) {
+      insights.add({
+        'type': 'total',
+        'icon': '📈',
+        'title': _language == 'en' ? 'Total completions' : 'Всего выполнений',
+        'value': totalCompletions.toString(),
+        'color': const Color(0xFF6C63FF),
+      });
+    }
+
+    // Инсайт 2: Лучшая привычка
+    if (_habits.isNotEmpty) {
+      final bestHabit = _habits.reduce((a, b) => 
+        a.completedDates.length > b.completedDates.length ? a : b
+      );
+      if (bestHabit.completedDates.isNotEmpty) {
+        insights.add({
+          'type': 'best_habit',
+          'icon': '🏆',
+          'title': _language == 'en' ? 'Most consistent' : 'Самая стабильная',
+          'value': bestHabit.title,
+          'color': const Color(0xFF4ECDC4),
+        });
+      }
+    }
+
+    // Инсайт 3: Лучший день
+    final bestDay = getBestDayOfWeek();
+    if ((bestDay['count'] as int) > 0) {
+      final dayNamesEn = {'Пн': 'Monday', 'Вт': 'Tuesday', 'Ср': 'Wednesday', 'Чт': 'Thursday', 'Пт': 'Friday', 'Сб': 'Saturday', 'Вс': 'Sunday'};
+      insights.add({
+        'type': 'best_day',
+        'icon': '⭐',
+        'title': _language == 'en' ? 'Best day' : 'Лучший день',
+        'value': _language == 'en' ? dayNamesEn[bestDay['day']]! : bestDay['day'],
+        'color': const Color(0xFFF7DC6F),
+      });
+    }
+
+    // Инсайт 4: Серия
+    if (bestStreak >= 3) {
+      insights.add({
+        'type': 'streak',
+        'icon': '🔥',
+        'title': _language == 'en' ? 'Current best streak' : 'Текущая серия',
+        'value': '$bestStreak ${_language == 'en' ? 'days' : 'дней'}',
+        'color': const Color(0xFFFF6B6B),
+      });
+    }
+
+    // Инсайт 5: Процент за неделю
+    final weeklyData = getWeeklyData();
+    final weekTotal = weeklyData.values.fold<int>(0, (a, b) => a + b);
+    final weekMax = _habits.length * 7;
+    if (weekMax > 0) {
+      final weekPercentage = ((weekTotal / weekMax) * 100).round();
+      insights.add({
+        'type': 'week_percentage',
+        'icon': '📊',
+        'title': _language == 'en' ? 'Week completion' : 'За неделю',
+        'value': '$weekPercentage%',
+        'color': const Color(0xFFBB8FCE),
+      });
+    }
+
+    return insights;
+  }
+
+  // Получить данные для круговой диаграммы по категориям (дни недели)
+  Map<String, int> getCompletionByCategory() {
+    final Map<String, int> data = {};
+    
+    // Считаем привычки по их средней успешности
+    for (final habit in _habits) {
+      final completionRate = habit.completedDates.length > 14 ? 'high' : 
+                            habit.completedDates.length > 7 ? 'medium' : 'low';
+      data[completionRate] = (data[completionRate] ?? 0) + 1;
+    }
+    
+    return data;
+  }
+
+  // Получить привычки с сериями >= 7 дней
+  List<Habit> get habitsWithLongStreaks {
+    return _habits.where((h) => h.streak >= 7).toList();
+  }
+
+  // Общее количество дней, когда была выполнена хотя бы одна привычка
+  int get activeDays {
+    final allDates = <String>{};
+    for (final habit in _habits) {
+      allDates.addAll(habit.completedDates);
+    }
+    return allDates.length;
+  }
+
+  // Средний процент выполнения за последние 30 дней
+  double get averageMonthlyCompletion {
+    final now = DateTime.now();
+    int totalPossible = _habits.length * 30;
+    int totalCompleted = 0;
+
+    for (int i = 0; i < 30; i++) {
+      final date = now.subtract(Duration(days: i));
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      for (final habit in _habits) {
+        if (habit.completedDates.contains(dateStr)) {
+          totalCompleted++;
+        }
+      }
+    }
+
+    return totalPossible > 0 ? (totalCompleted / totalPossible) * 100 : 0;
   }
 }

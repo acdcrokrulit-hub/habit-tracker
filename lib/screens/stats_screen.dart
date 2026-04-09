@@ -14,13 +14,38 @@ class StatsScreen extends StatefulWidget {
   State<StatsScreen> createState() => _StatsScreenState();
 }
 
-class _StatsScreenState extends State<StatsScreen> {
+class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
+
+    _animationController.forward();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NavigationProvider>().goStats();
     });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -44,20 +69,30 @@ class _StatsScreenState extends State<StatsScreen> {
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildAppBar(),
-                      const SizedBox(height: 24),
-                      _buildHeader(),
-                      const SizedBox(height: 24),
-                      _buildStatsGrid(),
-                      const SizedBox(height: 24),
-                      _buildWeeklyChart(),
-                      const SizedBox(height: 24),
-                      _buildAchievements(),
-                      const SizedBox(height: 80),
-                    ],
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildAppBar(),
+                          const SizedBox(height: 24),
+                          _buildHeader(),
+                          const SizedBox(height: 24),
+                          _buildStatsGrid(),
+                          const SizedBox(height: 24),
+                          _buildInsights(),
+                          const SizedBox(height: 24),
+                          _buildWeeklyChart(),
+                          const SizedBox(height: 24),
+                          _buildMonthlyTrendChart(),
+                          const SizedBox(height: 24),
+                          _buildAchievements(),
+                          const SizedBox(height: 80),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -76,7 +111,7 @@ class _StatsScreenState extends State<StatsScreen> {
         final isDark = provider.isDarkTheme;
         final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
         final cardColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
-        
+
         return Row(
           children: [
             InkWell(
@@ -107,44 +142,71 @@ class _StatsScreenState extends State<StatsScreen> {
     return Consumer<HabitProvider>(
       builder: (context, provider, _) {
         final t = _getStatsTranslations(provider.language);
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF6C63FF), Color(0xFF4ECDC4)]),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.4), blurRadius: 20, spreadRadius: 2),
-            ],
-          ),
-          child: Column(
-            children: [
-              Text(t['your_progress']!, style: const TextStyle(color: Colors.white, fontSize: 16)),
-              const SizedBox(height: 16),
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 160,
-                    height: 160,
-                    child: CircularProgressIndicator(
-                      value: provider.completionRate / 100,
-                      strokeWidth: 12,
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
+        return TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 1200),
+          curve: Curves.easeOutCubic,
+          tween: Tween<double>(begin: 0, end: provider.completionRate / 100),
+          builder: (context, value, _) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF6C63FF), Color(0xFF4ECDC4)]),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6C63FF).withOpacity(0.4),
+                    blurRadius: 20,
+                    spreadRadius: 2,
                   ),
-                  Column(
+                ],
+              ),
+              child: Column(
+                children: [
+                  Text(t['your_progress']!, style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  const SizedBox(height: 16),
+                  Stack(
+                    alignment: Alignment.center,
                     children: [
-                      Text('${provider.completionRate}%',
-                          style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold)),
-                      Text(t['completed_today']!,
-                          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
+                      SizedBox(
+                        width: 160,
+                        height: 160,
+                        child: TweenAnimationBuilder<double>(
+                          duration: const Duration(milliseconds: 1500),
+                          curve: Curves.easeOutCubic,
+                          tween: Tween<double>(begin: 0, end: provider.completionRate / 100),
+                          builder: (context, animValue, _) {
+                            return CircularProgressIndicator(
+                              value: animValue,
+                              strokeWidth: 12,
+                              backgroundColor: Colors.white.withOpacity(0.2),
+                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                            );
+                          },
+                        ),
+                      ),
+                      Column(
+                        children: [
+                          TweenAnimationBuilder<int>(
+                            duration: const Duration(milliseconds: 1500),
+                            curve: Curves.easeOutCubic,
+                            tween: IntTween(begin: 0, end: provider.completionRate),
+                            builder: (context, animValue, _) {
+                              return Text(
+                                '$animValue%',
+                                style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold),
+                              );
+                            },
+                          ),
+                          Text(t['completed_today']!,
+                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
+                        ],
+                      ),
                     ],
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -162,30 +224,40 @@ class _StatsScreenState extends State<StatsScreen> {
           crossAxisSpacing: 12,
           childAspectRatio: 1.6,
           children: [
-            _buildStatCard('📊', '${provider.totalHabits}', t['total_habits']!, const Color(0xFFFF6B6B)),
-            _buildStatCard('✅', '${provider.completedToday}', t['completed']!, const Color(0xFF4ECDC4)),
-            _buildStatCard('🔥', '${provider.bestStreak}', t['best_streak']!, const Color(0xFFF7DC6F)),
-            _buildStatCard('⭐', '${provider.habits.where((h) => h.streak >= 7).length}', t['achievements']!, const Color(0xFFBB8FCE)),
+            _buildAnimatedStatCard('📊', '${provider.totalHabits}', t['total_habits']!, const Color(0xFFFF6B6B), 0),
+            _buildAnimatedStatCard('✅', '${provider.completedToday}', t['completed']!, const Color(0xFF4ECDC4), 1),
+            _buildAnimatedStatCard('🔥', '${provider.bestStreak}', t['best_streak']!, const Color(0xFFF7DC6F), 2),
+            _buildAnimatedStatCard('⭐', '${provider.habits.where((h) => h.streak >= 7).length}', t['achievements']!, const Color(0xFFBB8FCE), 3),
           ],
         );
       },
     );
   }
 
-  Widget _buildStatCard(
-    String emoji,
-    String value,
-    String label,
-    Color color,
-  ) {
+  Widget _buildAnimatedStatCard(String emoji, String value, String label, Color color, int index) {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 600 + (index * 100)),
+      curve: Curves.easeOutCubic,
+      tween: Tween<double>(begin: 0, end: 1),
+      builder: (context, animValue, _) {
+        return Transform.scale(
+          scale: 0.8 + (0.2 * animValue),
+          child: Opacity(
+            opacity: animValue,
+            child: _buildStatCard(emoji, value, label, color),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCard(String emoji, String value, String label, Color color) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-        ),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -196,11 +268,7 @@ class _StatsScreenState extends State<StatsScreen> {
           Flexible(
             child: Text(
               value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
             ),
@@ -209,12 +277,100 @@ class _StatsScreenState extends State<StatsScreen> {
           Flexible(
             child: Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFFAAAAAA),
-                fontSize: 9,
-              ),
+              style: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 9),
               overflow: TextOverflow.ellipsis,
               maxLines: 2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInsights() {
+    return Consumer<HabitProvider>(
+      builder: (context, provider, _) {
+        final insights = provider.getInsights();
+        final isDark = provider.isDarkTheme;
+        final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+        final t = _getInsightsTranslations(provider.language);
+
+        if (insights.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t['insights']!, style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ...insights.asMap().entries.map((entry) {
+              final index = entry.key;
+              final insight = entry.value;
+              return TweenAnimationBuilder<double>(
+                duration: Duration(milliseconds: 500 + (index * 100)),
+                curve: Curves.easeOutCubic,
+                tween: Tween<double>(begin: 0, end: 1),
+                builder: (context, value, _) {
+                  return Transform.translate(
+                    offset: Offset(0, 20 * (1 - value)),
+                    child: Opacity(
+                      opacity: value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildInsightCard(insight),
+                      ),
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInsightCard(Map<String, dynamic> insight) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A2E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: (insight['color'] as Color).withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: (insight['color'] as Color).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Text(insight['icon'] as String, style: const TextStyle(fontSize: 24)),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  insight['title'] as String,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  insight['value'] as String,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -299,24 +455,15 @@ class _StatsScreenState extends State<StatsScreen> {
                               padding: const EdgeInsets.only(top: 8),
                               child: Text(
                                 entries[value.toInt()].key,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.6),
-                                  fontSize: 12,
-                                ),
+                                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
                               ),
                             );
                           },
                         ),
                       ),
-                      leftTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
+                      leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
                     gridData: const FlGridData(show: false),
                     borderData: FlBorderData(show: false),
@@ -356,13 +503,121 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
+  Widget _buildMonthlyTrendChart() {
+    return Consumer<HabitProvider>(
+      builder: (context, provider, _) {
+        if (provider.totalHabits == 0) return const SizedBox.shrink();
+
+        final t = _getStatsTranslations(provider.language);
+        final isDark = provider.isDarkTheme;
+        final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+        final cardColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
+
+        final trendData = provider.getMonthlyTrendData();
+        final spots = trendData.entries
+            .map((e) => FlSpot(double.parse(e.key), e.value))
+            .toList();
+
+        if (spots.isEmpty) return const SizedBox.shrink();
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t['monthly_trend']!, style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 24),
+              SizedBox(
+                height: 200,
+                child: LineChart(
+                  LineChartData(
+                    gridData: const FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: 25,
+                    ),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 30,
+                          interval: 5,
+                          getTitlesWidget: (value, meta) {
+                            return Text(
+                              '${value.toInt()}',
+                              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 10),
+                            );
+                          },
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 40,
+                          getTitlesWidget: (value, meta) {
+                            return Text(
+                              '${value.toInt()}%',
+                              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 10),
+                            );
+                          },
+                        ),
+                      ),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: spots,
+                        isCurved: true,
+                        curveSmoothness: 0.3,
+                        gradient: const LinearGradient(colors: [Color(0xFF6C63FF), Color(0xFF4ECDC4)]),
+                        barWidth: 3,
+                        dotData: const FlDotData(show: false),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF6C63FF).withOpacity(0.3),
+                              const Color(0xFF4ECDC4).withOpacity(0.1),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
+                    ],
+                    lineTouchData: LineTouchData(
+                      enabled: true,
+                      touchTooltipData: LineTouchTooltipData(
+                        tooltipBgColor: const Color(0xFF6C63FF),
+                        tooltipPadding: const EdgeInsets.all(8),
+                        tooltipMargin: 8,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildAchievements() {
     return Consumer<HabitProvider>(
       builder: (context, provider, _) {
         final t = _getStatsTranslations(provider.language);
         final isDark = provider.isDarkTheme;
         final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
-        
+
         final achievements = [
           {'emoji': '🌟', 'title': t['first_step']!, 'description': t['first_step_desc']!, 'unlocked': provider.totalHabits > 0},
           {'emoji': '🔥', 'title': t['fire_streak']!, 'description': t['fire_streak_desc']!, 'unlocked': provider.bestStreak >= 7},
@@ -375,7 +630,27 @@ class _StatsScreenState extends State<StatsScreen> {
           children: [
             Text(t['achievements']!, style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            ...achievements.map((achievement) => _buildAchievementItem(achievement, isDark)),
+            ...achievements.asMap().entries.map((entry) {
+              final index = entry.key;
+              final achievement = entry.value;
+              return TweenAnimationBuilder<double>(
+                duration: Duration(milliseconds: 400 + (index * 100)),
+                curve: Curves.easeOutCubic,
+                tween: Tween<double>(begin: 0, end: 1),
+                builder: (context, value, _) {
+                  return Transform.translate(
+                    offset: Offset(0, 15 * (1 - value)),
+                    child: Opacity(
+                      opacity: value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildAchievementItem(achievement, isDark),
+                      ),
+                    ),
+                  );
+                },
+              );
+            }).toList(),
           ],
         );
       },
@@ -402,18 +677,28 @@ class _StatsScreenState extends State<StatsScreen> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: isUnlocked
-                  ? const Color(0xFF4ECDC4).withOpacity(0.2)
-                  : Colors.grey.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(achievement['emoji'] as String, style: const TextStyle(fontSize: 26)),
-            ),
+          TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeOutBack,
+            tween: Tween<double>(begin: 0.8, end: 1.0),
+            builder: (context, value, _) {
+              return Transform.scale(
+                scale: value,
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: isUnlocked
+                        ? const Color(0xFF4ECDC4).withOpacity(0.2)
+                        : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(achievement['emoji'] as String, style: const TextStyle(fontSize: 26)),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -427,9 +712,19 @@ class _StatsScreenState extends State<StatsScreen> {
               ],
             ),
           ),
-          Icon(
-            isUnlocked ? Icons.check_circle : Icons.lock_outline,
-            color: isUnlocked ? const Color(0xFF4ECDC4) : Colors.grey.withOpacity(0.5),
+          TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOutCubic,
+            tween: Tween<double>(begin: 0, end: 1),
+            builder: (context, value, _) {
+              return Transform.scale(
+                scale: value,
+                child: Icon(
+                  isUnlocked ? Icons.check_circle : Icons.lock_outline,
+                  color: isUnlocked ? const Color(0xFF4ECDC4) : Colors.grey.withOpacity(0.5),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -487,7 +782,6 @@ class _StatsScreenState extends State<StatsScreen> {
                 navProvider.goCalendar();
                 Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CalendarScreen()));
               } else if (index == 2) {
-                // Already on stats screen
                 navProvider.goStats();
               } else if (index == 3) {
                 navProvider.goProfile();
@@ -547,6 +841,7 @@ class _StatsScreenState extends State<StatsScreen> {
         'best_streak': 'Best Streak',
         'achievements': 'Achievements',
         'weekly_activity': 'Weekly Activity',
+        'monthly_trend': 'Monthly Trend',
         'first_step': 'First Step',
         'first_step_desc': 'Create your first habit',
         'fire_streak': 'Fire Streak',
@@ -568,6 +863,7 @@ class _StatsScreenState extends State<StatsScreen> {
       'best_streak': 'Лучшая серия',
       'achievements': 'Достижения',
       'weekly_activity': 'Активность за неделю',
+      'monthly_trend': 'Тренд за месяц',
       'first_step': 'Первый шаг',
       'first_step_desc': 'Создайте первую привычку',
       'fire_streak': 'Огненная серия',
@@ -578,6 +874,17 @@ class _StatsScreenState extends State<StatsScreen> {
       'champion_desc': '100% выполнение сегодня',
       'no_data': 'Нет данных',
       'no_data_desc': 'Добавьте привычки для отслеживания статистики',
+    };
+  }
+
+  Map<String, String> _getInsightsTranslations(String language) {
+    if (language == 'en') {
+      return {
+        'insights': 'Insights',
+      };
+    }
+    return {
+      'insights': 'Инсайты',
     };
   }
 }
