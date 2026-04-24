@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'package:intl/intl.dart';
 import '../providers/habit_provider.dart';
 import '../providers/navigation_provider.dart';
 import 'home_screen.dart';
@@ -18,6 +20,9 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  final CalendarFormat _calendarFormat = CalendarFormat.month;
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay = DateTime.now();
 
   @override
   void initState() {
@@ -84,7 +89,11 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                           const SizedBox(height: 24),
                           _buildInsights(),
                           const SizedBox(height: 24),
+                          _buildExtraMetrics(),
+                          const SizedBox(height: 24),
                           _buildWeeklyChart(),
+                          const SizedBox(height: 24),
+                          _buildCalendarSection(),
                           const SizedBox(height: 24),
                           _buildMonthlyTrendChart(),
                           const SizedBox(height: 24),
@@ -324,7 +333,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                   );
                 },
               );
-            }).toList(),
+            }),
           ],
         );
       },
@@ -503,6 +512,126 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     );
   }
 
+  Widget _buildCalendarSection() {
+    return Consumer<HabitProvider>(
+      builder: (context, provider, _) {
+        final t = _getStatsTranslations(provider.language);
+        final isDark = provider.isDarkTheme;
+        final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+        final cardColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
+        final events = _buildCalendarEvents(provider);
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t['calendar_title']!, style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              TableCalendar(
+                firstDay: DateTime.utc(DateTime.now().year - 1, 1, 1),
+                lastDay: DateTime.utc(DateTime.now().year + 1, 12, 31),
+                focusedDay: _focusedDay,
+                locale: provider.language == 'ru' ? 'ru_RU' : 'en_US',
+                calendarFormat: _calendarFormat,
+                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                eventLoader: (day) {
+                  final normalized = DateTime(day.year, day.month, day.day);
+                  return events[normalized] ?? [];
+                },
+                calendarStyle: CalendarStyle(
+                  todayDecoration: BoxDecoration(
+                    color: const Color(0xFF6C63FF).withOpacity(0.25),
+                    shape: BoxShape.circle,
+                  ),
+                  selectedDecoration: const BoxDecoration(
+                    color: Color(0xFF6C63FF),
+                    shape: BoxShape.circle,
+                  ),
+                  markerDecoration: const BoxDecoration(
+                    color: Color(0xFF4ECDC4),
+                    shape: BoxShape.circle,
+                  ),
+                  markerSize: 5,
+                ),
+                headerStyle: HeaderStyle(
+                  formatButtonVisible: false,
+                  titleCentered: true,
+                  titleTextStyle: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16),
+                  leftChevronIcon: Icon(Icons.chevron_left, color: textColor),
+                  rightChevronIcon: Icon(Icons.chevron_right, color: textColor),
+                ),
+                onDaySelected: (selectedDay, focusedDay) {
+                  setState(() {
+                    _selectedDay = selectedDay;
+                    _focusedDay = focusedDay;
+                  });
+                },
+                onPageChanged: (focusedDay) {
+                  _focusedDay = focusedDay;
+                },
+              ),
+              const SizedBox(height: 16),
+              _buildCalendarSummary(provider, provider.isDarkTheme),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCalendarSummary(HabitProvider provider, bool isDark) {
+    final t = _getStatsTranslations(provider.language);
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+    if (_selectedDay == null) {
+      return const SizedBox.shrink();
+    }
+
+    final dateStr = '${_selectedDay!.year}-${_selectedDay!.month.toString().padLeft(2, '0')}-${_selectedDay!.day.toString().padLeft(2, '0')}';
+    final completedHabits = provider.habits.where((habit) => habit.completedDates.contains(dateStr)).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${t['selected_day']!}: ${_selectedDay!.day.toString().padLeft(2, '0')}.${_selectedDay!.month.toString().padLeft(2, '0')}.${_selectedDay!.year}',
+          style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          completedHabits.isNotEmpty
+              ? '${completedHabits.length} ${t['completed_habits']!}'
+              : t['no_habits_day']!,
+          style: TextStyle(color: textColor.withOpacity(0.75), fontSize: 14),
+        ),
+      ],
+    );
+  }
+
+  Map<DateTime, List<String>> _buildCalendarEvents(HabitProvider provider) {
+    final Map<DateTime, List<String>> events = {};
+    for (final habit in provider.habits) {
+      for (final dateStr in habit.completedDates) {
+        try {
+          final date = DateTime.parse(dateStr);
+          final normalized = DateTime(date.year, date.month, date.day);
+          events.putIfAbsent(normalized, () => []);
+          if (!events[normalized]!.contains(habit.title)) {
+            events[normalized]!.add(habit.title);
+          }
+        } catch (_) {
+          continue;
+        }
+      }
+    }
+    return events;
+  }
+
   Widget _buildMonthlyTrendChart() {
     return Consumer<HabitProvider>(
       builder: (context, provider, _) {
@@ -593,11 +722,11 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                         ),
                       ),
                     ],
-                    lineTouchData: LineTouchData(
+                    lineTouchData: const LineTouchData(
                       enabled: true,
                       touchTooltipData: LineTouchTooltipData(
-                        tooltipBgColor: const Color(0xFF6C63FF),
-                        tooltipPadding: const EdgeInsets.all(8),
+                        tooltipBgColor: Color(0xFF6C63FF),
+                        tooltipPadding: EdgeInsets.all(8),
                         tooltipMargin: 8,
                       ),
                     ),
@@ -650,7 +779,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                   );
                 },
               );
-            }).toList(),
+            }),
           ],
         );
       },
@@ -726,6 +855,63 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExtraMetrics() {
+    return Consumer<HabitProvider>(
+      builder: (context, provider, _) {
+        final t = _getStatsTranslations(provider.language);
+        final isDark = provider.isDarkTheme;
+        final cardColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
+        final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t['more_metrics']!, style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(child: _buildMetricCard('📅', '${provider.activeDays}', t['active_days']!, provider)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildMetricCard('📈', '${provider.averageMonthlyCompletion.round()}%', t['monthly_avg']!, provider)),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMetricCard(String emoji, String value, String label, HabitProvider provider) {
+    final isDark = provider.isDarkTheme;
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 22)),
+          const SizedBox(height: 10),
+          Text(value, style: TextStyle(color: textColor, fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 12)),
         ],
       ),
     );
@@ -842,6 +1028,13 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         'achievements': 'Achievements',
         'weekly_activity': 'Weekly Activity',
         'monthly_trend': 'Monthly Trend',
+        'calendar_title': 'Calendar',
+        'selected_day': 'Selected day',
+        'completed_habits': 'completed habits',
+        'no_habits_day': 'No habits completed',
+        'more_metrics': 'More metrics',
+        'active_days': 'Active days',
+        'monthly_avg': 'Monthly average',
         'first_step': 'First Step',
         'first_step_desc': 'Create your first habit',
         'fire_streak': 'Fire Streak',
@@ -864,6 +1057,13 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
       'achievements': 'Достижения',
       'weekly_activity': 'Активность за неделю',
       'monthly_trend': 'Тренд за месяц',
+      'calendar_title': 'Календарь',
+      'selected_day': 'Выбранный день',
+      'completed_habits': 'выполнено привычек',
+      'no_habits_day': 'Привычки не выполнены',
+      'more_metrics': 'Дополнительные метрики',
+      'active_days': 'Активных дней',
+      'monthly_avg': 'Среднее за месяц',
       'first_step': 'Первый шаг',
       'first_step_desc': 'Создайте первую привычку',
       'fire_streak': 'Огненная серия',

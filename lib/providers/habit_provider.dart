@@ -1,16 +1,36 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/habit.dart';
+import '../services/notification_service.dart';
+import '../services/supabase_service.dart';
 
 class HabitProvider with ChangeNotifier {
   List<Habit> _habits = [];
+  String? _userId;
   String _userName = 'Пользователь';
   String? _profilePhotoPath;
   bool _notificationsEnabled = true;
   bool _isDarkTheme = true;
   String _language = 'ru';
+  String _reminderTime = '20:00';
+  bool _initialized = false;
+
+  // Auth state subscription
+  StreamSubscription? _authSubscription;
+
+  List<Habit> get habits => _habits;
+  String? get userId => _userId;
+  String get userName => _userName;
+  String? get profilePhotoPath => _profilePhotoPath;
+  bool get notificationsEnabled => _notificationsEnabled;
+  bool get isDarkTheme => _isDarkTheme;
+  String get language => _language;
+  String get reminderTime => _reminderTime;
+  bool get initialized => _initialized;
 
   static const List<String> colors = [
     '#FF6B6B',
@@ -28,23 +48,110 @@ class HabitProvider with ChangeNotifier {
   ];
 
   static const List<String> icons = [
-    '💪', '📚', '🏃', '💧', '🧘', '✍️', '🎯', '💤', '🥗', '📱',
-    '🎨', '🎸', '🚴', '🍎', '🌅', '📝', '🔥', '⭐', '💎', '🎵',
+    '💪',
+    '📚',
+    '🏃',
+    '💧',
+    '🧘',
+    '✍️',
+    '🎯',
+    '💤',
+    '🥗',
+    '📱',
+    '🎨',
+    '🎸',
+    '🚴',
+    '🍎',
+    '🌅',
+    '📝',
+    '🔥',
+    '⭐',
+    '💎',
+    '🎵',
   ];
 
-  List<Habit> get habits => _habits;
-  String get userName => _userName;
-  String? get profilePhotoPath => _profilePhotoPath;
-  bool get notificationsEnabled => _notificationsEnabled;
-  bool get isDarkTheme => _isDarkTheme;
-  String get language => _language;
+  TimeOfDay get reminderTimeOfDay {
+    final parts = _reminderTime.split(':');
+    if (parts.length != 2) return const TimeOfDay(hour: 20, minute: 0);
+    return TimeOfDay(
+      hour: int.tryParse(parts[0]) ?? 20,
+      minute: int.tryParse(parts[1]) ?? 0,
+    );
+  }
+
+  String get reminderTimeDisplay {
+    final time = reminderTimeOfDay;
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
 
   HabitProvider() {
-    _loadHabits();
-    _loadSettings();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await NotificationService.instance.init();
+
+    // Check actual Supabase session - don't auto-login from stored userId
+    final currentUser = SupabaseService.instance.getCurrentUser();
+    if (currentUser != null) {
+      _userId = currentUser.id;
+      await _loadHabits();
+    }
+    // If no session, _userId stays null and auth screen will show
+
+    await _loadSettings();
+
+    // Listen to Supabase auth state changes
+    _authSubscription =
+        SupabaseService.instance.onAuthStateChange().listen((AuthState data) {
+      final session = data.session;
+      final user = session?.user;
+
+      if (user != null) {
+        // User signed in
+        if (_userId != user.id) {
+          _userId = user.id;
+          _saveUserId();
+          notifyListeners();
+          // Reload habits for new user
+          _loadHabits();
+        }
+      } else {
+        // User signed out or session expired
+        if (_userId != null) {
+          _userId = null;
+          _removeUserId();
+          _habits.clear();
+          notifyListeners();
+        }
+      }
+    });
+
+    _initialized = true;
+    notifyListeners();
+    if (_notificationsEnabled) {
+      await _scheduleDailyReminder();
+    }
   }
 
   Future<void> _loadHabits() async {
+    if (_userId == null) return;
+    await _loadHabitsLocal();
+
+    try {
+      final remoteHabits = await SupabaseService.instance.fetchHabits(_userId!);
+      if (remoteHabits.isNotEmpty) {
+        _habits = remoteHabits;
+        notifyListeners();
+      } else if (_habits.isNotEmpty) {
+        await SupabaseService.instance.upsertHabits(_habits, _userId!);
+      }
+    } catch (_) {
+      // Если Supabase недоступна, оставляем локальные данные.
+    }
+  }
+
+  Future<void> _loadHabitsLocal() async {
     final prefs = await SharedPreferences.getInstance();
     final habitsJson = prefs.getString('habits');
     if (habitsJson != null) {
@@ -58,9 +165,13 @@ class HabitProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _userName = prefs.getString('userName') ?? 'Пользователь';
     _profilePhotoPath = prefs.getString('profilePhotoPath');
+    if (_profilePhotoPath?.isEmpty ?? true) {
+      _profilePhotoPath = null;
+    }
     _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
     _isDarkTheme = prefs.getBool('isDarkTheme') ?? true;
     _language = prefs.getString('language') ?? 'ru';
+    _reminderTime = prefs.getString('reminderTime') ?? '20:00';
     notifyListeners();
   }
 
@@ -71,6 +182,7 @@ class HabitProvider with ChangeNotifier {
     await prefs.setBool('notificationsEnabled', _notificationsEnabled);
     await prefs.setBool('isDarkTheme', _isDarkTheme);
     await prefs.setString('language', _language);
+    await prefs.setString('reminderTime', _reminderTime);
     notifyListeners();
   }
 
@@ -89,36 +201,166 @@ class HabitProvider with ChangeNotifier {
     _saveSettings();
   }
 
-  void toggleNotifications(bool value) {
+  Future<void> toggleNotifications(bool value) async {
     _notificationsEnabled = value;
-    _saveSettings();
+    await _saveSettings();
+    if (_notificationsEnabled) {
+      await _scheduleDailyReminder();
+    } else {
+      await NotificationService.instance.cancelReminder(1);
+    }
   }
 
-  void toggleTheme(bool isDark) {
+  Future<void> toggleTheme(bool isDark) async {
     _isDarkTheme = isDark;
-    _saveSettings();
+    await _saveSettings();
   }
 
-  void setLanguage(String lang) {
+  Future<void> setLanguage(String lang) async {
     _language = lang;
-    _saveSettings();
+    notifyListeners();
+    await _saveSettings();
+    if (_notificationsEnabled) {
+      await _scheduleDailyReminder();
+    }
+  }
+
+  Future<void> setReminderTime(TimeOfDay time) async {
+    _reminderTime =
+        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    await _saveSettings();
+    if (_notificationsEnabled) {
+      await _scheduleDailyReminder();
+    }
+  }
+
+  Future<void> signUp(String email, String password) async {
+    print('Attempting to sign up with email: $email');
+    try {
+      final response = await SupabaseService.instance.signUp(email, password);
+      print('Sign up response user: ${response.user}');
+      print('Sign up response user id: ${response.user?.id}');
+      _userId = response.user?.id;
+      print('Setting _userId to: $_userId');
+      await _saveUserId();
+      await _loadHabits();
+      notifyListeners();
+    } catch (e) {
+      print('Sign up error: $e');
+      final errorStr = e.toString();
+      if (errorStr.contains('429') || errorStr.contains('rate limit')) {
+        throw Exception(
+            'Слишком много запросов. Подождите немного и попробуйте снова.');
+      } else if (errorStr.contains('400') &&
+          errorStr.contains('already been registered')) {
+        throw Exception(
+            'Пользователь с таким email уже существует. Попробуйте войти.');
+      } else if (errorStr.contains('weak_password')) {
+        throw Exception(
+            'Пароль слишком слабый. Используйте минимум 6 символов.');
+      } else if (errorStr.contains('confirmed') ||
+          errorStr.contains(' confirmation')) {
+        throw Exception(
+            'Требуется подтверждение email. Проверьте почту или запросите повторное отправление.');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> signIn(String email, String password) async {
+    print('Attempting to sign in with email: $email');
+    try {
+      // Clear any existing session to avoid conflicts
+      try {
+        await SupabaseService.instance.signOut();
+      } catch (_) {}
+
+      final response = await SupabaseService.instance.signIn(email, password);
+      print('Sign in response: ${response.user?.id}');
+      _userId = response.user?.id;
+      await _saveUserId();
+      await _loadHabits();
+      notifyListeners();
+    } catch (e) {
+      print('Sign in error: $e');
+      final errorStr = e.toString();
+      if (errorStr.contains('400') ||
+          errorStr.contains('Invalid login credentials')) {
+        throw Exception('Неверный email или пароль.');
+      } else if (errorStr.contains('429') || errorStr.contains('rate limit')) {
+        throw Exception(
+            'Слишком много запросов. Подождите немного и попробуйте снова.');
+      } else if (errorStr.contains('Email not confirmed') ||
+          errorStr.contains('confirmed') ||
+          errorStr.contains('confirmation')) {
+        throw Exception(
+            'Email не подтвержден. Проверьте почту или нажмите "Отправить повторно".');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> resendConfirmation(String email) async {
+    await SupabaseService.instance.resendConfirmation(email);
+  }
+
+  Future<void> signOut() async {
+    await SupabaseService.instance.signOut();
+    _userId = null;
+    await _removeUserId();
+    _habits.clear();
+    // Force clear any cached auth state
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_id');
+    notifyListeners();
+  }
+
+  Future<void> _scheduleDailyReminder() async {
+    if (!_notificationsEnabled) return;
+    await NotificationService.instance.scheduleDailyReminder(
+      1,
+      _language == 'en' ? 'Habit reminder' : 'Напоминание',
+      _language == 'en'
+          ? 'Don’t forget to complete your habits today!'
+          : 'Не забудь выполнить свои привычки сегодня!',
+      reminderTimeOfDay,
+    );
   }
 
   Future<void> _saveHabits() async {
+    print(
+        '_saveHabits called. UserId: $_userId, Habits count: ${_habits.length}');
     final prefs = await SharedPreferences.getInstance();
     final habitsJson = json.encode(_habits.map((h) => h.toJson()).toList());
     await prefs.setString('habits', habitsJson);
     notifyListeners();
+
+    if (_userId != null) {
+      try {
+        print('Attempting to save habits to Supabase for userId: $_userId');
+        await SupabaseService.instance.upsertHabits(_habits, _userId!);
+        print('Successfully saved habits to Supabase');
+      } catch (e) {
+        print('Error saving habits to Supabase: $e');
+        // Если Supabase недоступна, сохраняем только локально.
+      }
+    } else {
+      print('UserId is null, skipping Supabase save');
+    }
   }
 
-  void addHabit(String title, String description, {bool hasProgress = false, double targetValue = 1.0, String unit = 'раз'}) {
+  Future<void> addHabit(String title, String description,
+      {bool hasProgress = false,
+      double targetValue = 1.0,
+      String unit = 'раз'}) async {
     final random = math.Random();
     final habit = Habit(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      userId: _userId ?? '',
       title: title,
       description: description,
-      color: colors[random.nextInt(colors.length)],
-      icon: icons[random.nextInt(icons.length)],
+      color: HabitProvider.colors[random.nextInt(HabitProvider.colors.length)],
+      icon: HabitProvider.icons[random.nextInt(HabitProvider.icons.length)],
       completedDates: [],
       createdAt: DateTime.now(),
       hasProgress: hasProgress,
@@ -126,12 +368,13 @@ class HabitProvider with ChangeNotifier {
       unit: unit,
     );
     _habits.add(habit);
-    _saveHabits();
+    await _saveHabits();
   }
 
-  void toggleHabit(String habitId) {
+  Future<void> toggleHabit(String habitId) async {
     final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
     _habits = _habits.map((habit) {
       if (habit.id == habitId) {
@@ -152,25 +395,28 @@ class HabitProvider with ChangeNotifier {
       return habit;
     }).toList();
 
-    _saveHabits();
+    await _saveHabits();
   }
 
-  void updateProgress(String habitId, double addedValue) {
+  Future<void> updateProgress(String habitId, double addedValue) async {
     final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
     _habits = _habits.map((habit) {
       if (habit.id == habitId && habit.hasProgress) {
         final currentProgress = habit.progressHistory[todayStr] ?? 0.0;
         final newProgress = currentProgress + addedValue;
-        
-        final newProgressHistory = Map<String, double>.from(habit.progressHistory);
+
+        final newProgressHistory =
+            Map<String, double>.from(habit.progressHistory);
         newProgressHistory[todayStr] = newProgress.clamp(0, habit.targetValue);
 
         List<String> newDates = List<String>.from(habit.completedDates);
         if (newProgress >= habit.targetValue && !newDates.contains(todayStr)) {
           newDates.add(todayStr);
-        } else if (newProgress < habit.targetValue && newDates.contains(todayStr)) {
+        } else if (newProgress < habit.targetValue &&
+            newDates.contains(todayStr)) {
           newDates.remove(todayStr);
         }
 
@@ -184,16 +430,18 @@ class HabitProvider with ChangeNotifier {
       return habit;
     }).toList();
 
-    _saveHabits();
+    await _saveHabits();
   }
 
-  void resetProgress(String habitId) {
+  Future<void> resetProgress(String habitId) async {
     final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
     _habits = _habits.map((habit) {
       if (habit.id == habitId && habit.hasProgress) {
-        final newProgressHistory = Map<String, double>.from(habit.progressHistory);
+        final newProgressHistory =
+            Map<String, double>.from(habit.progressHistory);
         newProgressHistory.remove(todayStr);
 
         final updatedHabit = habit.copyWith(
@@ -204,11 +452,11 @@ class HabitProvider with ChangeNotifier {
       return habit;
     }).toList();
 
-    _saveHabits();
+    await _saveHabits();
   }
 
   // Отметить привычку за конкретную дату
-  void toggleHabitForDate(String habitId, String dateStr) {
+  Future<void> toggleHabitForDate(String habitId, String dateStr) async {
     _habits = _habits.map((habit) {
       if (habit.id == habitId) {
         final isCompleted = habit.completedDates.contains(dateStr);
@@ -228,23 +476,26 @@ class HabitProvider with ChangeNotifier {
       return habit;
     }).toList();
 
-    _saveHabits();
+    await _saveHabits();
   }
 
   // Обновить прогресс за конкретную дату
-  void updateProgressForDate(String habitId, String dateStr, double addedValue) {
+  Future<void> updateProgressForDate(
+      String habitId, String dateStr, double addedValue) async {
     _habits = _habits.map((habit) {
       if (habit.id == habitId && habit.hasProgress) {
         final currentProgress = habit.progressHistory[dateStr] ?? 0.0;
         final newProgress = currentProgress + addedValue;
 
-        final newProgressHistory = Map<String, double>.from(habit.progressHistory);
+        final newProgressHistory =
+            Map<String, double>.from(habit.progressHistory);
         newProgressHistory[dateStr] = newProgress.clamp(0, habit.targetValue);
 
         List<String> newDates = List<String>.from(habit.completedDates);
         if (newProgress >= habit.targetValue && !newDates.contains(dateStr)) {
           newDates.add(dateStr);
-        } else if (newProgress < habit.targetValue && newDates.contains(dateStr)) {
+        } else if (newProgress < habit.targetValue &&
+            newDates.contains(dateStr)) {
           newDates.remove(dateStr);
         }
 
@@ -272,14 +523,14 @@ class HabitProvider with ChangeNotifier {
 
   int _calculateStreak(List<String> completedDates) {
     if (completedDates.isEmpty) return 0;
-    
+
     final sortedDates = [...completedDates]..sort((a, b) => b.compareTo(a));
     int streak = 0;
     DateTime? prevDate;
-    
+
     for (final dateStr in sortedDates) {
       final currentDate = DateTime.parse(dateStr);
-      
+
       if (prevDate == null) {
         streak = 1;
       } else {
@@ -292,28 +543,35 @@ class HabitProvider with ChangeNotifier {
       }
       prevDate = currentDate;
     }
-    
+
     return streak;
   }
 
-  void deleteHabit(String habitId) {
+  Future<void> deleteHabit(String habitId) async {
     _habits.removeWhere((habit) => habit.id == habitId);
-    _saveHabits();
+    await _saveHabits();
+    if (_userId != null) {
+      try {
+        await SupabaseService.instance.deleteHabit(habitId, _userId!);
+      } catch (_) {}
+    }
   }
 
-  void updateHabit(Habit habit) {
+  Future<void> updateHabit(Habit habit) async {
     _habits = _habits.map((h) => h.id == habit.id ? habit : h).toList();
-    _saveHabits();
+    await _saveHabits();
   }
 
   int get completedToday {
     final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     return _habits.where((h) => h.completedDates.contains(todayStr)).length;
   }
 
   int completedForDate(DateTime date) {
-    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     return _habits.where((h) => h.completedDates.contains(dateStr)).length;
   }
 
@@ -335,11 +593,12 @@ class HabitProvider with ChangeNotifier {
 
     for (int i = 6; i >= 0; i--) {
       final date = now.subtract(Duration(days: i));
-      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      final dateStr =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
       final dayNamesRu = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
       final dayNamesEn = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      final dayName = _language == 'en' 
-          ? dayNamesEn[date.weekday - 1] 
+      final dayName = _language == 'en'
+          ? dayNamesEn[date.weekday - 1]
           : dayNamesRu[date.weekday - 1];
 
       int completed = 0;
@@ -362,16 +621,19 @@ class HabitProvider with ChangeNotifier {
 
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(now.year, now.month, day);
-      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      
+      final dateStr =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
       int completed = 0;
       for (final habit in _habits) {
         if (habit.completedDates.contains(dateStr)) {
           completed++;
         }
       }
-      
-      final percentage = _habits.isEmpty ? 0.0 : (completed.toDouble() / _habits.length.toDouble()) * 100.0;
+
+      final percentage = _habits.isEmpty
+          ? 0.0
+          : (completed.toDouble() / _habits.length.toDouble()) * 100.0;
       trendData[day.toString()] = percentage;
     }
 
@@ -381,10 +643,22 @@ class HabitProvider with ChangeNotifier {
   // Получить лучший день недели
   Map<String, dynamic> getBestDayOfWeek() {
     final Map<String, int> dayCounts = {
-      'Пн': 0, 'Вт': 0, 'Ср': 0, 'Чт': 0, 'Пт': 0, 'Сб': 0, 'Вс': 0
+      'Пн': 0,
+      'Вт': 0,
+      'Ср': 0,
+      'Чт': 0,
+      'Пт': 0,
+      'Сб': 0,
+      'Вс': 0
     };
     final Map<String, int> dayOccurrences = {
-      'Пн': 0, 'Вт': 0, 'Ср': 0, 'Чт': 0, 'Пт': 0, 'Сб': 0, 'Вс': 0
+      'Пн': 0,
+      'Вт': 0,
+      'Ср': 0,
+      'Чт': 0,
+      'Пт': 0,
+      'Сб': 0,
+      'Вс': 0
     };
 
     for (final habit in _habits) {
@@ -412,11 +686,12 @@ class HabitProvider with ChangeNotifier {
   // Получить инсайты на основе данных
   List<Map<String, dynamic>> getInsights() {
     final List<Map<String, dynamic>> insights = [];
-    
+
     if (_habits.isEmpty) return insights;
 
     // Инсайт 1: Общая статистика
-    final totalCompletions = _habits.fold<int>(0, (sum, h) => sum + h.completedDates.length);
+    final totalCompletions =
+        _habits.fold<int>(0, (sum, h) => sum + h.completedDates.length);
     if (totalCompletions > 0) {
       insights.add({
         'type': 'total',
@@ -429,9 +704,8 @@ class HabitProvider with ChangeNotifier {
 
     // Инсайт 2: Лучшая привычка
     if (_habits.isNotEmpty) {
-      final bestHabit = _habits.reduce((a, b) => 
-        a.completedDates.length > b.completedDates.length ? a : b
-      );
+      final bestHabit = _habits.reduce(
+          (a, b) => a.completedDates.length > b.completedDates.length ? a : b);
       if (bestHabit.completedDates.isNotEmpty) {
         insights.add({
           'type': 'best_habit',
@@ -446,12 +720,21 @@ class HabitProvider with ChangeNotifier {
     // Инсайт 3: Лучший день
     final bestDay = getBestDayOfWeek();
     if ((bestDay['count'] as int) > 0) {
-      final dayNamesEn = {'Пн': 'Monday', 'Вт': 'Tuesday', 'Ср': 'Wednesday', 'Чт': 'Thursday', 'Пт': 'Friday', 'Сб': 'Saturday', 'Вс': 'Sunday'};
+      final dayNamesEn = {
+        'Пн': 'Monday',
+        'Вт': 'Tuesday',
+        'Ср': 'Wednesday',
+        'Чт': 'Thursday',
+        'Пт': 'Friday',
+        'Сб': 'Saturday',
+        'Вс': 'Sunday'
+      };
       insights.add({
         'type': 'best_day',
         'icon': '⭐',
         'title': _language == 'en' ? 'Best day' : 'Лучший день',
-        'value': _language == 'en' ? dayNamesEn[bestDay['day']]! : bestDay['day'],
+        'value':
+            _language == 'en' ? dayNamesEn[bestDay['day']]! : bestDay['day'],
         'color': const Color(0xFFF7DC6F),
       });
     }
@@ -488,14 +771,17 @@ class HabitProvider with ChangeNotifier {
   // Получить данные для круговой диаграммы по категориям (дни недели)
   Map<String, int> getCompletionByCategory() {
     final Map<String, int> data = {};
-    
+
     // Считаем привычки по их средней успешности
     for (final habit in _habits) {
-      final completionRate = habit.completedDates.length > 14 ? 'high' : 
-                            habit.completedDates.length > 7 ? 'medium' : 'low';
+      final completionRate = habit.completedDates.length > 14
+          ? 'high'
+          : habit.completedDates.length > 7
+              ? 'medium'
+              : 'low';
       data[completionRate] = (data[completionRate] ?? 0) + 1;
     }
-    
+
     return data;
   }
 
@@ -521,7 +807,8 @@ class HabitProvider with ChangeNotifier {
 
     for (int i = 0; i < 30; i++) {
       final date = now.subtract(Duration(days: i));
-      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      final dateStr =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
       for (final habit in _habits) {
         if (habit.completedDates.contains(dateStr)) {
           totalCompleted++;
@@ -530,5 +817,28 @@ class HabitProvider with ChangeNotifier {
     }
 
     return totalPossible > 0 ? (totalCompleted / totalPossible) * 100 : 0;
+  }
+
+  Future<void> _saveUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_id', _userId ?? '');
+  }
+
+  Future<void> _removeUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_id');
+    await prefs.remove('current_user_email');
+  }
+
+  Future<void> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    _userId = prefs.getString('user_id');
+    // Don't notify here; will be synced via auth state listener
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

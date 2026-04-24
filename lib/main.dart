@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/auth_screen.dart';
 import 'providers/habit_provider.dart';
 import 'providers/navigation_provider.dart';
+import 'services/notification_service.dart';
+import 'services/supabase_service.dart';
+import 'debug_supabase.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.instance.init();
+  await SupabaseService.initialize(
+    url: 'https://djauslrsmnqgfjljmqln.supabase.co',
+    anonKey: 'sb_publishable_UlzUd9yG-_x8qnuUN3Xf9w_vI8pX7bZ',
+  );
   runApp(const MyApp());
 }
 
@@ -24,7 +34,27 @@ class MyApp extends StatelessWidget {
             title: 'Habit Tracker',
             debugShowCheckedModeBanner: false,
             theme: habitProvider.isDarkTheme ? _darkTheme : _lightTheme,
-            home: const HomeScreen(),
+            home: !habitProvider.initialized
+                ? const Scaffold(
+                    body: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text('Загрузка...'),
+                        ],
+                      ),
+                    ),
+                  )
+                : habitProvider.userId != null
+                    ? const HomeScreen()
+                    : AuthScreen(),
+            routes: {
+              '/home': (context) => const HomeScreen(),
+              '/auth': (context) => AuthScreen(),
+              '/debug': (context) => const DebugSupabasePage(),
+            },
           );
         },
       ),

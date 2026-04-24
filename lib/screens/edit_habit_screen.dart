@@ -397,7 +397,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
               Switch(
                 value: _hasProgress,
                 onChanged: (value) => setState(() => _hasProgress = value),
-                activeColor: const Color(0xFF6C63FF),
+                activeThumbColor: const Color(0xFF6C63FF),
               ),
             ],
           ),
@@ -461,7 +461,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                         ),
                       ),
                       child: DropdownButtonFormField<String>(
-                        value: _selectedUnit,
+                        initialValue: _selectedUnit,
                         dropdownColor: const Color(0xFF1A1A2E),
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
@@ -687,7 +687,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
       try {
         targetValue = double.parse(_targetController.text.trim());
         if (targetValue <= 0) {
-          throw FormatException();
+          throw const FormatException();
         }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(

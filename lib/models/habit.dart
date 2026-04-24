@@ -1,5 +1,6 @@
 class Habit {
   final String id;
+  final String userId;
   final String title;
   final String description;
   final String color;
@@ -14,6 +15,7 @@ class Habit {
 
   Habit({
     required this.id,
+    required this.userId,
     required this.title,
     required this.description,
     required this.color,
@@ -29,6 +31,7 @@ class Habit {
 
   Habit copyWith({
     String? id,
+    String? userId,
     String? title,
     String? description,
     String? color,
@@ -43,6 +46,7 @@ class Habit {
   }) {
     return Habit(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       title: title ?? this.title,
       description: description ?? this.description,
       color: color ?? this.color,
@@ -60,6 +64,7 @@ class Habit {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'userId': userId,
       'title': title,
       'description': description,
       'color': color,
@@ -77,6 +82,7 @@ class Habit {
   factory Habit.fromJson(Map<String, dynamic> json) {
     return Habit(
       id: json['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      userId: json['userId'] ?? '',
       title: json['title'] ?? '',
       description: json['description'] ?? '',
       color: json['color'] ?? '#6C63FF',

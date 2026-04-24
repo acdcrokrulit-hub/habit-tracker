@@ -130,66 +130,74 @@ class _CalendarScreenState extends State<CalendarScreen> {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3)),
           ),
-          child: TableCalendar(
-            firstDay: DateTime.utc(2020, 1, 1),
-            lastDay: DateTime.utc(2030, 12, 31),
-            focusedDay: _focusedDay,
-            calendarFormat: _calendarFormat,
-            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-            eventLoader: (day) {
-              final normalizedDate = DateTime(day.year, day.month, day.day);
-              return events[normalizedDate] ?? [];
-            },
-            startingDayOfWeek: StartingDayOfWeek.monday,
-            calendarStyle: CalendarStyle(
-              outsideDaysVisible: false,
-              weekendTextStyle: const TextStyle(color: Color(0xFFFF6B6B)),
-              holidayTextStyle: const TextStyle(color: Color(0xFFFF6B6B)),
-              selectedDecoration: const BoxDecoration(
-                color: Color(0xFF6C63FF),
-                shape: BoxShape.circle,
-              ),
-              todayDecoration: BoxDecoration(
-                color: const Color(0xFF4ECDC4).withOpacity(0.3),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF4ECDC4), width: 2),
-              ),
-              markerDecoration: const BoxDecoration(
-                color: Color(0xFF4ECDC4),
-                shape: BoxShape.circle,
-              ),
-              markersMaxCount: 3,
-            ),
-            headerStyle: const HeaderStyle(
-              formatButtonVisible: true,
-              titleCentered: true,
-              formatButtonShowsNext: false,
-              formatButtonDecoration: BoxDecoration(
-                color: Color(0xFF6C63FF),
-                borderRadius: BorderRadius.all(Radius.circular(12)),
-              ),
-              formatButtonTextStyle: TextStyle(color: Colors.white, fontSize: 12),
-              titleTextStyle: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-              rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
-            ),
-            daysOfWeekStyle: const DaysOfWeekStyle(
-              weekdayStyle: TextStyle(color: Colors.white54, fontSize: 12),
-              weekendStyle: TextStyle(color: Color(0xFFFF6B6B), fontSize: 12),
-            ),
-            onDaySelected: (selectedDay, focusedDay) {
-              setState(() {
-                _selectedDay = selectedDay;
-                _focusedDay = focusedDay;
-              });
-            },
-            onFormatChanged: (format) {
-              setState(() {
-                _calendarFormat = format;
-              });
-            },
-            onPageChanged: (focusedDay) {
-              _focusedDay = focusedDay;
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SizedBox(
+                width: constraints.maxWidth,
+                child: TableCalendar(
+                  firstDay: DateTime.utc(2020, 1, 1),
+                  lastDay: DateTime.utc(2030, 12, 31),
+                  focusedDay: _focusedDay,
+                  locale: provider.language == 'ru' ? 'ru_RU' : 'en_US',
+                  calendarFormat: _calendarFormat,
+                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  eventLoader: (day) {
+                    final normalizedDate = DateTime(day.year, day.month, day.day);
+                    return events[normalizedDate] ?? [];
+                  },
+                  startingDayOfWeek: StartingDayOfWeek.monday,
+                  calendarStyle: CalendarStyle(
+                    outsideDaysVisible: false,
+                    weekendTextStyle: const TextStyle(color: Color(0xFFFF6B6B)),
+                    holidayTextStyle: const TextStyle(color: Color(0xFFFF6B6B)),
+                    selectedDecoration: const BoxDecoration(
+                      color: Color(0xFF6C63FF),
+                      shape: BoxShape.circle,
+                    ),
+                    todayDecoration: BoxDecoration(
+                      color: const Color(0xFF4ECDC4).withOpacity(0.3),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF4ECDC4), width: 2),
+                    ),
+                    markerDecoration: const BoxDecoration(
+                      color: Color(0xFF4ECDC4),
+                      shape: BoxShape.circle,
+                    ),
+                    markersMaxCount: 3,
+                  ),
+                  headerStyle: const HeaderStyle(
+                    formatButtonVisible: true,
+                    titleCentered: true,
+                    formatButtonShowsNext: false,
+                    formatButtonDecoration: BoxDecoration(
+                      color: Color(0xFF6C63FF),
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                    ),
+                    formatButtonTextStyle: TextStyle(color: Colors.white, fontSize: 12),
+                    titleTextStyle: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+                    rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+                  ),
+                  daysOfWeekStyle: const DaysOfWeekStyle(
+                    weekdayStyle: TextStyle(color: Colors.white54, fontSize: 12),
+                    weekendStyle: TextStyle(color: Color(0xFFFF6B6B), fontSize: 12),
+                  ),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      _selectedDay = selectedDay;
+                      _focusedDay = focusedDay;
+                    });
+                  },
+                  onFormatChanged: (format) {
+                    setState(() {
+                      _calendarFormat = format;
+                    });
+                  },
+                  onPageChanged: (focusedDay) {
+                    _focusedDay = focusedDay;
+                  },
+                ),
+              );
             },
           ),
         );
@@ -228,7 +236,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     });
                   },
                   icon: const Icon(Icons.calendar_today_rounded),
-                  label: const Text('Показать сегодня'),
+                  label: Text(t['show_today']!),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6C63FF),
                     foregroundColor: Colors.white,
@@ -248,7 +256,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         final percentage = totalHabits > 0 ? ((completedCount / totalHabits) * 100).round() : 0;
 
         final isToday = isSameDay(_selectedDay, DateTime.now());
-        final isPast = _selectedDay!.isBefore(DateTime.now());
+        final isPastOrToday = !_selectedDay!.isAfter(DateTime.now());
         final dateTitle = isToday
             ? t['today']!
             : '${_selectedDay!.day.toString().padLeft(2, '0')}.${_selectedDay!.month.toString().padLeft(2, '0')}.${_selectedDay!.year}';
@@ -295,17 +303,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 minHeight: 8,
                 borderRadius: BorderRadius.circular(4),
               ),
-              if (isPast) ...[
+              if (isPastOrToday) ...[
                 const SizedBox(height: 16),
                 InkWell(
                   onTap: () {
-                    // Отметить все привычки за этот день
                     for (final habit in uncompletedHabits) {
                       provider.toggleHabitForDate(habit.id, selectedDateStr);
                     }
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('✅ Все привычки отмечены за ${dateTitle}'),
+                        content: Text('${t['all_habits_marked']!} $dateTitle'),
                         backgroundColor: const Color(0xFF4ECDC4),
                         behavior: SnackBarBehavior.floating,
                       ),
@@ -324,9 +331,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       children: [
                         const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF4ECDC4), size: 20),
                         const SizedBox(width: 8),
-                        Text(
-                          'Отметить все привычки за этот день',
-                          style: const TextStyle(color: Color(0xFF4ECDC4), fontSize: 14, fontWeight: FontWeight.w600),
+                        Expanded(
+                          child: Text(
+                            t['mark_all_habits']!,
+                            style: const TextStyle(color: Color(0xFF4ECDC4), fontSize: 14, fontWeight: FontWeight.w600),
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -341,16 +352,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
               if (completedHabits.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(
-                  '✅ Выполненные',
+                  '✅ ${t['completed']!}',
                   style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 ...completedHabits.map((habit) => _buildHabitItem(habit, isDark, true, provider, selectedDateStr)),
               ],
-              if (uncompletedHabits.isNotEmpty && isPast) ...[
+              if (uncompletedHabits.isNotEmpty && isPastOrToday) ...[
                 const SizedBox(height: 16),
                 Text(
-                  '⭕ Не выполненные',
+                  '⭕ ${t['uncompleted']!}',
                   style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
@@ -416,7 +427,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
         int totalCompletions = 0;
         int totalPossibleHabits = 0;
         int bestStreakInMonth = 0;
-        int currentStreak = 0;
 
         for (final habit in provider.habits) {
           int monthCompletions = 0;
@@ -590,6 +600,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
         'today': 'Today',
         'habits_completed': 'Habits Completed',
         'habits': 'habits',
+        'mark_all_habits': 'Mark all habits for this day',
+        'all_habits_marked': '✅ All habits marked for',
+        'show_today': 'Show today',
+        'completed': 'Completed',
+        'uncompleted': 'Uncompleted',
         'monthly_stats': 'Monthly Statistics',
         'completions': 'Completions',
         'rate': 'Completion Rate',
@@ -602,6 +617,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
       'today': 'Сегодня',
       'habits_completed': 'Выполненные привычки',
       'habits': 'привычек',
+      'mark_all_habits': 'Отметить все привычки за этот день',
+      'all_habits_marked': '✅ Все привычки отмечены за',
+      'show_today': 'Показать сегодня',
+      'completed': 'Выполненные',
+      'uncompleted': 'Не выполненные',
       'monthly_stats': 'Статистика за месяц',
       'completions': 'Выполнений',
       'rate': 'Процент',

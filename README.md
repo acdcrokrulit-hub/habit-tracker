@@ -114,7 +114,30 @@ flutter build ios --release
 
 Этот проект создан в образовательных целях.
 
-## 🤝 Вклад
+## � Supabase
+
+Для работы с Supabase нужно создать таблицу `habits` в вашей базе. Вот SQL-запрос, который можно выполнить в SQL-редакторе Supabase:
+
+```sql
+create table habits (
+  id text primary key,
+  title text not null,
+  description text,
+  color text,
+  icon text,
+  completedDates jsonb,
+  createdAt timestamptz,
+  streak int,
+  hasProgress boolean,
+  targetValue numeric,
+  unit text,
+  progressHistory jsonb
+);
+```
+
+Затем убедитесь, что `lib/main.dart` и `lib/services/supabase_service.dart` подключены к вашему проекту Supabase с правильным URL и `anonKey`.
+
+## �🤝 Вклад
 
 Pull requests приветствуются! Для серьезных изменений, пожалуйста, откройте issue сначала.
 

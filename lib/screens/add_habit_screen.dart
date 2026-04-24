@@ -274,7 +274,7 @@ class _AddHabitScreenState extends State<AddHabitScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   t['start_journey']!,
                   style: const TextStyle(
