@@ -96,14 +96,16 @@ class HabitProvider with ChangeNotifier {
     if (currentUser != null) {
       _userId = currentUser.id;
       await _loadHabits();
+      await _loadSettingsFromSupabase();
     }
     // If no session, _userId stays null and auth screen will show
 
     await _loadSettings();
 
     // Listen to Supabase auth state changes
-    _authSubscription =
-        SupabaseService.instance.onAuthStateChange().listen((AuthState data) {
+    _authSubscription = SupabaseService.instance
+        .onAuthStateChange()
+        .listen((AuthState data) async {
       final session = data.session;
       final user = session?.user;
 
@@ -114,7 +116,8 @@ class HabitProvider with ChangeNotifier {
           _saveUserId();
           notifyListeners();
           // Reload habits for new user
-          _loadHabits();
+          await _loadHabits();
+          await _loadSettingsFromSupabase();
         }
       } else {
         // User signed out or session expired
@@ -186,24 +189,72 @@ class HabitProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _loadSettingsFromSupabase() async {
+    if (_userId == null) return;
+    try {
+      final settings =
+          await SupabaseService.instance.fetchUserSettings(_userId!);
+      if (settings != null) {
+        _userName = settings['username'] ?? settings['userName'] ?? _userName;
+        var photo =
+            settings['profilephotopath'] ?? settings['profilePhotoPath'];
+        _profilePhotoPath = (photo != null && photo.isNotEmpty) ? photo : null;
+        _notificationsEnabled = settings['notificationsenabled'] ??
+            settings['notificationsEnabled'] ??
+            _notificationsEnabled;
+        _isDarkTheme =
+            settings['isdarktheme'] ?? settings['isDarkTheme'] ?? _isDarkTheme;
+        _language = settings['language'] ?? _language;
+        _reminderTime = settings['remindertime'] ??
+            settings['reminderTime'] ??
+            _reminderTime;
+        notifyListeners();
+        await _saveSettings();
+      }
+    } catch (e) {
+      print('Error loading settings from Supabase: $e');
+    }
+  }
+
+  Future<void> _saveSettingsToSupabase() async {
+    if (_userId == null) return;
+    try {
+      await SupabaseService.instance.upsertUserSettings(_userId!, {
+        'userid': _userId,
+        'username': _userName,
+        'profilephotopath': _profilePhotoPath ?? '',
+        'notificationsenabled': _notificationsEnabled,
+        'isdarktheme': _isDarkTheme,
+        'language': _language,
+        'remindertime': _reminderTime,
+      });
+    } catch (e) {
+      print('Error saving settings to Supabase: $e');
+    }
+  }
+
   Future<void> setProfilePhoto(String path) async {
     _profilePhotoPath = path;
     await _saveSettings();
+    await _saveSettingsToSupabase();
   }
 
   Future<void> removeProfilePhoto() async {
     _profilePhotoPath = null;
     await _saveSettings();
+    await _saveSettingsToSupabase();
   }
 
-  void setUserName(String name) {
+  void setUserName(String name) async {
     _userName = name;
-    _saveSettings();
+    await _saveSettings();
+    await _saveSettingsToSupabase();
   }
 
   Future<void> toggleNotifications(bool value) async {
     _notificationsEnabled = value;
     await _saveSettings();
+    await _saveSettingsToSupabase();
     if (_notificationsEnabled) {
       await _scheduleDailyReminder();
     } else {
@@ -214,12 +265,14 @@ class HabitProvider with ChangeNotifier {
   Future<void> toggleTheme(bool isDark) async {
     _isDarkTheme = isDark;
     await _saveSettings();
+    await _saveSettingsToSupabase();
   }
 
   Future<void> setLanguage(String lang) async {
     _language = lang;
     notifyListeners();
     await _saveSettings();
+    await _saveSettingsToSupabase();
     if (_notificationsEnabled) {
       await _scheduleDailyReminder();
     }
@@ -229,6 +282,7 @@ class HabitProvider with ChangeNotifier {
     _reminderTime =
         '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
     await _saveSettings();
+    await _saveSettingsToSupabase();
     if (_notificationsEnabled) {
       await _scheduleDailyReminder();
     }
@@ -244,6 +298,7 @@ class HabitProvider with ChangeNotifier {
       print('Setting _userId to: $_userId');
       await _saveUserId();
       await _loadHabits();
+      await _loadSettingsFromSupabase();
       notifyListeners();
     } catch (e) {
       print('Sign up error: $e');
@@ -280,6 +335,7 @@ class HabitProvider with ChangeNotifier {
       _userId = response.user?.id;
       await _saveUserId();
       await _loadHabits();
+      await _loadSettingsFromSupabase();
       notifyListeners();
     } catch (e) {
       print('Sign in error: $e');
@@ -309,9 +365,6 @@ class HabitProvider with ChangeNotifier {
     _userId = null;
     await _removeUserId();
     _habits.clear();
-    // Force clear any cached auth state
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_id');
     notifyListeners();
   }
 

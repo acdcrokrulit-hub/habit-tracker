@@ -64,51 +64,59 @@ class Habit {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'userId': userId,
+      'userid': userId,
       'title': title,
       'description': description,
       'color': color,
       'icon': icon,
-      'completedDates': completedDates,
-      'createdAt': createdAt.toIso8601String(),
+      'completeddates': completedDates,
+      'createdat': createdAt.toIso8601String(),
       'streak': streak,
-      'hasProgress': hasProgress,
-      'targetValue': targetValue,
+      'hasprogress': hasProgress,
+      'targetvalue': targetValue,
       'unit': unit,
-      'progressHistory': progressHistory,
+      'progresshistory': progressHistory,
     };
   }
 
   factory Habit.fromJson(Map<String, dynamic> json) {
     return Habit(
       id: json['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      userId: json['userId'] ?? '',
+      userId: json['userId'] ?? json['userid'] ?? '',
       title: json['title'] ?? '',
       description: json['description'] ?? '',
       color: json['color'] ?? '#6C63FF',
       icon: json['icon'] ?? '🎯',
-      completedDates: List<String>.from(json['completedDates'] ?? []),
+      completedDates: List<String>.from(
+          json['completedDates'] ?? json['completeddates'] ?? []),
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
+          : json['createdat'] != null
+              ? DateTime.parse(json['createdat'])
+              : DateTime.now(),
       streak: json['streak'] ?? 0,
-      hasProgress: json['hasProgress'] ?? false,
-      targetValue: (json['targetValue'] ?? 1.0).toDouble(),
+      hasProgress: json['hasProgress'] ?? json['hasprogress'] ?? false,
+      targetValue:
+          (json['targetValue'] ?? json['targetvalue'] ?? 1.0).toDouble(),
       unit: json['unit'] ?? 'раз',
       progressHistory: json['progressHistory'] != null
           ? Map<String, double>.from(json['progressHistory'])
-          : {},
+          : json['progresshistory'] != null
+              ? Map<String, double>.from(json['progresshistory'])
+              : {},
     );
   }
 
   bool isCompletedToday() {
     final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     return completedDates.contains(todayStr);
   }
 
   bool isCompletedForDate(DateTime date) {
-    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     return completedDates.contains(dateStr);
   }
 
@@ -118,7 +126,8 @@ class Habit {
 
   double getTodayProgress() {
     final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     return progressHistory[todayStr] ?? 0.0;
   }
 
@@ -128,7 +137,8 @@ class Habit {
   }
 
   double getProgressPercentageForDate(DateTime date) {
-    if (!hasProgress || targetValue <= 0) return isCompletedForDate(date) ? 100 : 0;
+    if (!hasProgress || targetValue <= 0)
+      return isCompletedForDate(date) ? 100 : 0;
     return (getProgressForDateValue(date) / targetValue * 100).clamp(0, 100);
   }
 
@@ -164,7 +174,8 @@ class Habit {
     int count = 0;
     for (int i = 0; i < 7; i++) {
       final date = now.subtract(Duration(days: i));
-      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      final dateStr =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
       if (completedDates.contains(dateStr)) {
         count++;
       }
@@ -214,7 +225,8 @@ class Habit {
 
   // Получить прогресс за конкретную дату
   double getProgressForDate(DateTime date) {
-    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     return progressHistory[dateStr] ?? 0.0;
   }
 

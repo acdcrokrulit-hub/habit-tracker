@@ -13,16 +13,13 @@ class _AuthScreenState extends State<AuthScreen> {
   final _passwordController = TextEditingController();
   bool _isLogin = true;
   String? _errorMessage;
-  bool _emailSent = false;
   bool _isLoading = false;
-  bool _showResendOption = false;
 
   Future<void> _handleAuth() async {
     if (_isLoading) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
-      _showResendOption = false;
     });
     try {
       if (_isLogin) {
@@ -31,33 +28,23 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         await Provider.of<HabitProvider>(context, listen: false)
             .signUp(_emailController.text, _passwordController.text);
-        setState(() => _emailSent = true);
+      }
+      // Navigate to home on successful auth
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/home',
+          (route) => false,
+        );
       }
     } catch (e) {
-      final errorStr = e.toString();
       setState(() {
-        _errorMessage = errorStr;
-        // Show resend option if email not confirmed
-        _showResendOption = errorStr.contains('Email не подтвержден') ||
-            errorStr.contains('Email not confirmed') ||
-            errorStr.contains('not been confirmed');
+        _errorMessage = e.toString();
       });
     } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _resendEmail() async {
-    try {
-      await Provider.of<HabitProvider>(context, listen: false)
-          .resendConfirmation(_emailController.text);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Письмо подтверждения отправлено повторно')),
-      );
-      setState(() => _errorMessage = null);
-    } catch (e) {
-      setState(() => _errorMessage = e.toString());
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -70,68 +57,53 @@ class _AuthScreenState extends State<AuthScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_emailSent)
-              Column(
-                children: [
-                  Text(
-                      'Письмо подтверждения отправлено на ${_emailController.text}',
-                      textAlign: TextAlign.center),
-                  TextButton(
-                    onPressed: _resendEmail,
-                    child: Text('Отправить повторно'),
-                  ),
-                  SizedBox(height: 20),
-                ],
-              ),
             TextField(
               controller: _emailController,
+              enabled: !_isLoading,
               decoration: InputDecoration(labelText: 'Email'),
               keyboardType: TextInputType.emailAddress,
             ),
             TextField(
               controller: _passwordController,
+              enabled: !_isLoading,
               decoration: InputDecoration(labelText: 'Пароль'),
               obscureText: true,
             ),
             if (_errorMessage != null)
               Container(
                 padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
+                margin: const EdgeInsets.only(top: 16, bottom: 16),
                 decoration: BoxDecoration(
                   color: Colors.red.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.red.withOpacity(0.3)),
                 ),
-                child: Column(
-                  children: [
-                    Text(
-                      _errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (_showResendOption && _isLogin) ...[
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: _resendEmail,
-                        icon: const Icon(Icons.email_outlined, size: 16),
-                        label: const Text(
-                            'Отправить письмо подтверждения повторно'),
-                      ),
-                    ],
-                  ],
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
                 ),
               ),
             SizedBox(height: 20),
             ElevatedButton(
-              onPressed: _handleAuth,
-              child: Text(_isLogin ? 'Войти' : 'Зарегистрироваться'),
+              onPressed: _isLoading ? null : _handleAuth,
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(_isLogin ? 'Войти' : 'Зарегистрироваться'),
             ),
             TextButton(
-              onPressed: () => setState(() {
-                _isLogin = !_isLogin;
-                _errorMessage = null;
-                _emailSent = false;
-              }),
+              onPressed: _isLoading
+                  ? null
+                  : () => setState(() {
+                        _isLogin = !_isLogin;
+                        _errorMessage = null;
+                        _emailController.clear();
+                        _passwordController.clear();
+                      }),
               child: Text(_isLogin ? 'Создать аккаунт' : 'Уже есть аккаунт?'),
             ),
           ],

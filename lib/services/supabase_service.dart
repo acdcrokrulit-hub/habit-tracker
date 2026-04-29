@@ -6,15 +6,33 @@ class SupabaseService {
   SupabaseService._();
 
   static final SupabaseService instance = SupabaseService._();
+  static bool _isInitialized = false;
+  static String? _initializationError;
+
+  static bool get isInitialized => _isInitialized;
+  static String? get initializationError => _initializationError;
+
+  static void setInitializationError(String error) {
+    _initializationError = error;
+    _isInitialized = false;
+  }
 
   static Future<void> initialize({
     required String url,
     required String anonKey,
   }) async {
-    await Supabase.initialize(
-      url: url,
-      anonKey: anonKey,
-    );
+    try {
+      await Supabase.initialize(
+        url: url,
+        anonKey: anonKey,
+      );
+      _isInitialized = true;
+      _initializationError = null;
+    } catch (e) {
+      _isInitialized = false;
+      _initializationError = e.toString();
+      rethrow;
+    }
   }
 
   SupabaseClient get client => Supabase.instance.client;
@@ -75,8 +93,8 @@ class SupabaseService {
       final data = await client
           .from('habits')
           .select()
-          .eq('userId', userId)
-          .order('createdAt', ascending: false);
+          .eq('userid', userId)
+          .order('createdat', ascending: false);
 
       return data
           .map((item) => Habit.fromJson(Map<String, dynamic>.from(item as Map)))
@@ -106,7 +124,7 @@ class SupabaseService {
   }
 
   Future<void> deleteHabit(String id, String userId) async {
-    await client.from('habits').delete().eq('id', id).eq('userId', userId);
+    await client.from('habits').delete().eq('id', id).eq('userid', userId);
   }
 
   // Работа с настройками пользователя
@@ -115,7 +133,7 @@ class SupabaseService {
       final response = await client
           .from('user_settings')
           .select()
-          .eq('userId', userId)
+          .eq('userid', userId)
           .single();
 
       if (response != null) {
@@ -135,10 +153,10 @@ class SupabaseService {
   Future<void> upsertUserSettings(
       String userId, Map<String, dynamic> settings) async {
     try {
-      await client.from('user_settings').upsert({
-        'userId': userId,
-        ...settings,
-      }, onConflict: 'userId');
+      // Ensure the settings include the userid primary key
+      final data = Map<String, dynamic>.from(settings);
+      data['userid'] = userId;
+      await client.from('user_settings').upsert(data, onConflict: 'userid');
       print('Successfully upserted user settings');
     } catch (e) {
       print('Error upserting user settings: $e');
@@ -149,7 +167,7 @@ class SupabaseService {
   Future<void> updateUserSettings(
       String userId, Map<String, dynamic> settings) async {
     try {
-      await client.from('user_settings').update(settings).eq('userId', userId);
+      await client.from('user_settings').update(settings).eq('userid', userId);
       print('Successfully updated user settings');
     } catch (e) {
       print('Error updating user settings: $e');

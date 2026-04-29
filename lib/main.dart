@@ -11,10 +11,20 @@ import 'debug_supabase.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.instance.init();
-  await SupabaseService.initialize(
-    url: 'https://djauslrsmnqgfjljmqln.supabase.co',
-    anonKey: 'sb_publishable_UlzUd9yG-_x8qnuUN3Xf9w_vI8pX7bZ',
-  );
+
+  // Try to initialize Supabase, but don't fail if it's not available
+  try {
+    await SupabaseService.initialize(
+      url: 'https://djauslrsmnqgfjljmqln.supabase.co',
+      anonKey:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqYXVzbHJzbW5xZ2ZqbGptcWxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzOTUwNzcsImV4cCI6MjA5MTk3MTA3N30.bsvFgj_Y8h8Szvxe9gNavvjQSsl_eK8nhOIyNU-31UQ',
+    );
+  } catch (e) {
+    print('Warning: Could not initialize Supabase: $e');
+    print('App will use local storage only');
+    SupabaseService.setInitializationError(e.toString());
+  }
+
   runApp(const MyApp());
 }
 

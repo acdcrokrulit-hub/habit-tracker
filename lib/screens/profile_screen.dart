@@ -151,10 +151,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   _buildLanguageSection(
                                       provider, cardColor, textColor),
                                   const SizedBox(height: 24),
-                                  _buildLogoutButton(provider),
-                                  const SizedBox(height: 20),
                                   _buildAboutSection(
                                       cardColor, textColor, subtextColor),
+                                  const SizedBox(height: 20),
+                                  _buildLogoutButton(provider),
                                   const SizedBox(height: 20),
                                 ],
                               ),
@@ -800,12 +800,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await Provider.of<HabitProvider>(context, listen: false)
                     .signOut();
                 if (mounted) {
-                  Navigator.pushReplacementNamed(context, '/auth');
+                  // Clear all navigation history and go to auth screen
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/auth',
+                    (route) => false,
+                  );
                 }
               },
               icon: const Icon(Icons.logout_rounded, color: Colors.white),
               label: Text(
-                provider.language == 'en' ? 'Sign Out' : 'Выйти',
+                t['logout']!,
                 style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
