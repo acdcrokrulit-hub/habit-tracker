@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'screens/home_screen.dart';
 import 'screens/auth_screen.dart';
 import 'providers/habit_provider.dart';
@@ -11,6 +12,13 @@ import 'debug_supabase.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.instance.init();
+
+  // Initialize date formatting for calendar
+  try {
+    await initializeDateFormatting();
+  } catch (e) {
+    print('Warning: Could not initialize date formatting: $e');
+  }
 
   // Try to initialize Supabase, but don't fail if it's not available
   try {

@@ -114,6 +114,13 @@ class HabitProvider with ChangeNotifier {
         if (_userId != user.id) {
           _userId = user.id;
           _saveUserId();
+          // Reset to defaults before loading to avoid old user data
+          _userName = 'Пользователь';
+          _profilePhotoPath = null;
+          _notificationsEnabled = true;
+          _isDarkTheme = true;
+          _language = 'ru';
+          _reminderTime = '20:00';
           notifyListeners();
           // Reload habits for new user
           await _loadHabits();
@@ -195,21 +202,31 @@ class HabitProvider with ChangeNotifier {
       final settings =
           await SupabaseService.instance.fetchUserSettings(_userId!);
       if (settings != null) {
-        _userName = settings['username'] ?? settings['userName'] ?? _userName;
+        _userName =
+            settings['username'] ?? settings['userName'] ?? 'Пользователь';
         var photo =
             settings['profilephotopath'] ?? settings['profilePhotoPath'];
         _profilePhotoPath = (photo != null && photo.isNotEmpty) ? photo : null;
         _notificationsEnabled = settings['notificationsenabled'] ??
             settings['notificationsEnabled'] ??
-            _notificationsEnabled;
+            true;
         _isDarkTheme =
-            settings['isdarktheme'] ?? settings['isDarkTheme'] ?? _isDarkTheme;
-        _language = settings['language'] ?? _language;
-        _reminderTime = settings['remindertime'] ??
-            settings['reminderTime'] ??
-            _reminderTime;
+            settings['isdarktheme'] ?? settings['isDarkTheme'] ?? true;
+        _language = settings['language'] ?? 'ru';
+        _reminderTime =
+            settings['remindertime'] ?? settings['reminderTime'] ?? '20:00';
         notifyListeners();
         await _saveSettings();
+      } else {
+        // No settings row exists - create one with current (default) values
+        await SupabaseService.instance.createUserSettings(_userId!, {
+          'username': _userName,
+          'profilephotopath': _profilePhotoPath ?? '',
+          'notificationsenabled': _notificationsEnabled,
+          'isdarktheme': _isDarkTheme,
+          'language': _language,
+          'remindertime': _reminderTime,
+        });
       }
     } catch (e) {
       print('Error loading settings from Supabase: $e');
@@ -219,6 +236,7 @@ class HabitProvider with ChangeNotifier {
   Future<void> _saveSettingsToSupabase() async {
     if (_userId == null) return;
     try {
+      print('Saving settings to Supabase for user: $_userId');
       await SupabaseService.instance.upsertUserSettings(_userId!, {
         'userid': _userId,
         'username': _userName,
@@ -228,6 +246,7 @@ class HabitProvider with ChangeNotifier {
         'language': _language,
         'remindertime': _reminderTime,
       });
+      print('Settings saved successfully');
     } catch (e) {
       print('Error saving settings to Supabase: $e');
     }
@@ -297,6 +316,13 @@ class HabitProvider with ChangeNotifier {
       _userId = response.user?.id;
       print('Setting _userId to: $_userId');
       await _saveUserId();
+      // Reset to defaults before loading to avoid leaking old user data
+      _userName = 'Пользователь';
+      _profilePhotoPath = null;
+      _notificationsEnabled = true;
+      _isDarkTheme = true;
+      _language = 'ru';
+      _reminderTime = '20:00';
       await _loadHabits();
       await _loadSettingsFromSupabase();
       notifyListeners();
@@ -334,6 +360,13 @@ class HabitProvider with ChangeNotifier {
       print('Sign in response: ${response.user?.id}');
       _userId = response.user?.id;
       await _saveUserId();
+      // Reset to defaults before loading to avoid leaking old user data
+      _userName = 'Пользователь';
+      _profilePhotoPath = null;
+      _notificationsEnabled = true;
+      _isDarkTheme = true;
+      _language = 'ru';
+      _reminderTime = '20:00';
       await _loadHabits();
       await _loadSettingsFromSupabase();
       notifyListeners();
@@ -362,9 +395,31 @@ class HabitProvider with ChangeNotifier {
 
   Future<void> signOut() async {
     await SupabaseService.instance.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    // Capture old userId for key removal
+    final oldUserId = _userId;
+    // Clear all user-specific local data
+    if (oldUserId != null) {
+      await prefs.remove('habits_$oldUserId');
+    }
+    await prefs.remove('userName');
+    await prefs.remove('profilePhotoPath');
+    await prefs.remove('notificationsEnabled');
+    await prefs.remove('isDarkTheme');
+    await prefs.remove('language');
+    await prefs.remove('reminderTime');
+
     _userId = null;
     await _removeUserId();
     _habits.clear();
+    // Reset to defaults
+    _userName = 'Пользователь';
+    _profilePhotoPath = null;
+    _notificationsEnabled = true;
+    _isDarkTheme = true;
+    _language = 'ru';
+    _reminderTime = '20:00';
+
     notifyListeners();
   }
 

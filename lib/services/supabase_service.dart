@@ -179,7 +179,7 @@ class SupabaseService {
       String userId, Map<String, dynamic> settings) async {
     try {
       await client.from('user_settings').insert({
-        'userId': userId,
+        'userid': userId,
         ...settings,
       });
       print('Successfully created user settings');
